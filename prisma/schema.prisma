@@ -8,10 +8,46 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
 enum Role {
   ADMIN
   MEMBER
 }
+
+enum PipelineStage {
+  NEW_LEAD
+  QUALIFIED
+  DISCOVERY_CALL
+  PROPOSAL_SENT
+  FOLLOW_UP
+  WON
+  LOST
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Urgency {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ActivityType {
+  CALL
+  MEETING
+  EMAIL
+  PROPOSAL_SENT
+  FOLLOW_UP
+  STATUS_CHANGE
+  NOTE
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
 
 model Profile {
   id        String   @id @default(cuid())
@@ -23,4 +59,97 @@ model Profile {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("profiles")
+}
+
+model Lead {
+  id String @id @default(cuid())
+
+  // Contact
+  name        String
+  companyName String? @map("company_name")
+  phone       String?
+  email       String?
+
+  // Lead context
+  source            String?
+  serviceInterested String? @map("service_interested")
+  industry          String?
+  teamSize          String? @map("team_size")
+
+  // Online presence
+  socialProfiles  String? @map("social_profiles")
+  existingWebsite String? @map("existing_website")
+
+  // Discovery
+  currentProblem String? @map("current_problem")
+  currentTools   String? @map("current_tools")
+
+  // Status
+  priority      Priority      @default(MEDIUM)
+  urgency       Urgency       @default(MEDIUM)
+  pipelineStage PipelineStage @default(NEW_LEAD) @map("pipeline_stage")
+
+  // Timeline
+  lastContacted DateTime? @map("last_contacted")
+  nextFollowUp  DateTime? @map("next_follow_up")
+
+  // Deal
+  dealValue    Float?  @map("deal_value")
+  proposalSent Boolean @default(false) @map("proposal_sent")
+
+  // Internal
+  notes      String? // quick internal memo (from edit form)
+  assignedTo String? @map("assigned_to")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  noteEntries Note[]
+  activities  Activity[]
+  tasks       Task[]
+
+  @@map("leads")
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  leadId    String   @map("lead_id")
+  content   String
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("notes")
+}
+
+model Activity {
+  id          String       @id @default(cuid())
+  leadId      String       @map("lead_id")
+  type        ActivityType
+  description String
+  createdBy   String?      @map("created_by")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("activities")
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  leadId      String    @map("lead_id")
+  title       String
+  dueDate     DateTime? @map("due_date")
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at")
+  assignedTo  String?   @map("assigned_to")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("tasks")
 }
