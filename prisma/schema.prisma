@@ -47,6 +47,28 @@ enum ActivityType {
   NOTE
 }
 
+enum ProposalSectionType {
+  COVER
+  EXECUTIVE_SUMMARY
+  PROBLEM_STATEMENT
+  PROPOSED_SOLUTION
+  SCOPE_OF_WORK
+  TIMELINE
+  PRICING
+  ABOUT_US
+  TERMS
+  NEXT_STEPS
+  CUSTOM
+}
+
+enum ProposalStatus {
+  DRAFT
+  REVIEW
+  SENT
+  ACCEPTED
+  DECLINED
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model Profile {
@@ -108,6 +130,8 @@ model Lead {
   noteEntries Note[]
   activities  Activity[]
   tasks       Task[]
+  followUps   FollowUp[]
+  proposals   Proposal[]
 
   @@map("leads")
 }
@@ -152,4 +176,108 @@ model Task {
   lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@map("tasks")
+}
+
+model FollowUp {
+  id          String    @id @default(cuid())
+  leadId      String    @map("lead_id")
+  title       String
+  notes       String?
+  dueDate     DateTime  @map("due_date")
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at")
+  assignedTo  String?   @map("assigned_to")
+  templateId  String?   @map("template_id")
+  createdBy   String?   @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  lead     Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  template FollowUpTemplate? @relation(fields: [templateId], references: [id])
+
+  @@map("follow_ups")
+}
+
+model FollowUpTemplate {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  title     String
+  notes     String?
+  followUps FollowUp[]
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  @@map("follow_up_templates")
+}
+
+// ─── Proposal System ──────────────────────────────────────────────────────────
+
+model ProposalTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  sections  ProposalTemplateSection[]
+  proposals Proposal[]
+
+  @@map("proposal_templates")
+}
+
+model ProposalTemplateSection {
+  id              String              @id @default(cuid())
+  templateId      String              @map("template_id")
+  type            ProposalSectionType
+  title           String
+  contentTemplate String              @default("") @map("content_template")
+  order           Int
+  isRequired      Boolean             @default(true) @map("is_required")
+  isAIGenerated   Boolean             @default(false) @map("is_ai_generated")
+  metadata        Json?
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  template ProposalTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("proposal_template_sections")
+}
+
+model Proposal {
+  id         String         @id @default(cuid())
+  leadId     String         @map("lead_id")
+  templateId String?        @map("template_id")
+  title      String
+  status     ProposalStatus @default(DRAFT)
+  validUntil DateTime?      @map("valid_until")
+  totalValue Float?         @map("total_value")
+  createdBy  String?        @map("created_by")
+  sentAt     DateTime?      @map("sent_at")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+
+  lead     Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  template ProposalTemplate? @relation(fields: [templateId], references: [id])
+  sections ProposalSection[]
+
+  @@map("proposals")
+}
+
+model ProposalSection {
+  id            String              @id @default(cuid())
+  proposalId    String              @map("proposal_id")
+  type          ProposalSectionType
+  title         String
+  content       String              @default("")
+  order         Int
+  isAIGenerated Boolean             @default(false) @map("is_ai_generated")
+  isVisible     Boolean             @default(true) @map("is_visible")
+  metadata      Json?
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@map("proposal_sections")
 }

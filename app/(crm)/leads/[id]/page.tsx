@@ -5,12 +5,16 @@ import { getLead } from "@/actions/leads"
 import { getNotes } from "@/actions/notes"
 import { getActivities } from "@/actions/activities"
 import { getTasks } from "@/actions/tasks"
+import { getLeadFollowUps, getTemplates } from "@/actions/follow-ups"
+import { getLeadProposals } from "@/actions/proposals"
 import { EditDeleteButtons } from "@/components/lead-detail/edit-delete-buttons"
 import { FollowUpBanner } from "@/components/lead-detail/follow-up-banner"
 import { LeadOverviewCard } from "@/components/lead-detail/overview-card"
 import { NotesSection } from "@/components/lead-detail/notes-section"
 import { ActivitiesSection } from "@/components/lead-detail/activities-section"
 import { TasksSection } from "@/components/lead-detail/tasks-section"
+import { LeadFollowUpsSection } from "@/components/lead-detail/lead-follow-ups-section"
+import { LeadProposalsSection } from "@/components/lead-detail/lead-proposals-section"
 
 const STAGE_LABELS: Record<string, string> = {
   NEW_LEAD: "New Lead", QUALIFIED: "Qualified", DISCOVERY_CALL: "Discovery Call",
@@ -44,11 +48,14 @@ export default async function LeadDetailPage({
 }) {
   const { id } = await params
 
-  const [lead, notes, activities, tasks] = await Promise.all([
+  const [lead, notes, activities, tasks, followUps, templates, proposals] = await Promise.all([
     getLead(id),
     getNotes(id),
     getActivities(id),
     getTasks(id),
+    getLeadFollowUps(id),
+    getTemplates(),
+    getLeadProposals(id),
   ])
 
   if (!lead) notFound()
@@ -108,9 +115,24 @@ export default async function LeadDetailPage({
         </div>
       </div>
 
-      {/* Tasks — full width */}
+      {/* Tasks + Follow-ups — side by side on desktop */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-lg border bg-card p-5">
+          <TasksSection tasks={tasks} leadId={id} />
+        </div>
+        <div className="rounded-lg border bg-card p-5">
+          <LeadFollowUpsSection
+            followUps={followUps}
+            leadId={id}
+            leadName={lead.name}
+            templates={templates}
+          />
+        </div>
+      </div>
+
+      {/* Proposals */}
       <div className="rounded-lg border bg-card p-5">
-        <TasksSection tasks={tasks} leadId={id} />
+        <LeadProposalsSection proposals={proposals} leadId={id} />
       </div>
     </div>
   )

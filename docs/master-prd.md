@@ -156,3 +156,7 @@ The CRM should optimize:
 - lead organization
 - invoice generation
 - operational clarity
+
+
+Future module:
+Centralized Business Settings and Brand Context Layer for AI, templates, proposals, invoices, and communication consistency.
