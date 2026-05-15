@@ -1,16 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react"
+import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
 import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-  Font,
-} from "@react-pdf/renderer"
-import { COLORS, FONTS, SPACING, TYPE } from "./tokens"
+  COLORS, FONTS, SPACING, TYPE,
+  PDF_VISUAL_STYLES, type PdfVisualStyleKey,
+} from "./tokens"
 import type { ProposalWithSections } from "@/actions/proposals"
-
-// ─── Business context (future Settings integration) ───────────────────────────
 
 export interface PdfBusinessContext {
   agencyName?: string
@@ -18,90 +13,76 @@ export interface PdfBusinessContext {
   website?: string
 }
 
-// ─── StyleSheet ───────────────────────────────────────────────────────────────
+// ─── StyleSheet (fixed, non-dynamic styles) ───────────────────────────────────
 
 const s = StyleSheet.create({
-  // Pages
+  // ── Pages ──
   coverPage: {
     backgroundColor: COLORS.white,
     paddingHorizontal: SPACING.pagePaddingH,
-    paddingVertical: SPACING.pagePaddingV,
+    paddingTop: SPACING.pagePaddingV,
+    paddingBottom: 40,
     fontFamily: FONTS.regular,
-    display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
   },
   contentPage: {
     backgroundColor: COLORS.white,
     paddingHorizontal: SPACING.pagePaddingH,
-    paddingTop: SPACING.pagePaddingV,
-    paddingBottom: SPACING.pagePaddingV + 20,
+    paddingTop: 52,
+    paddingBottom: 60,
     fontFamily: FONTS.regular,
   },
 
-  // Cover
-  coverTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  coverAgency: { fontSize: TYPE.small, fontFamily: FONTS.bold, color: COLORS.muted, letterSpacing: 1 },
-  coverCenter: { flex: 1, justifyContent: "center", paddingVertical: 60 },
-  coverCompany: { fontSize: TYPE.coverCompany, fontFamily: FONTS.bold, color: COLORS.black, marginBottom: 10 },
-  coverTitle: { fontSize: TYPE.coverTitle, color: COLORS.body, marginBottom: 6 },
-  coverDivider: { width: 36, height: 2, backgroundColor: COLORS.black, marginVertical: 18 },
-  coverMeta: { fontSize: TYPE.coverMeta, color: COLORS.muted, marginBottom: 4 },
-  coverNote: { fontSize: TYPE.small, color: COLORS.muted, marginTop: 16, lineHeight: 1.5 },
-  coverBottom: { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 12 },
-  coverBottomText: { fontSize: TYPE.footer, color: COLORS.muted },
+  // ── Cover ──
+  coverLogoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  coverAgency: { fontSize: 9, fontFamily: FONTS.bold, color: COLORS.muted, letterSpacing: 1.5 },
+  coverCenter: { flex: 1, justifyContent: "center", paddingVertical: 56 },
+  coverEyebrow: { fontSize: 9, color: COLORS.muted, letterSpacing: 0.5, marginBottom: 10 },
+  coverCompany: { fontSize: TYPE.coverCompany, fontFamily: FONTS.bold, color: COLORS.black, marginBottom: 8, lineHeight: 1.2 },
+  coverTitle: { fontSize: TYPE.coverTitle, color: COLORS.body, lineHeight: 1.4 },
+  coverDivider: { width: 32, height: 2, backgroundColor: COLORS.black, marginTop: 20, marginBottom: 20 },
+  coverMeta: { fontSize: 9.5, color: COLORS.muted, marginBottom: 5 },
+  coverNote: { fontSize: 9, color: COLORS.muted, marginTop: 18, lineHeight: 1.6, fontFamily: FONTS.oblique },
+  coverBottom: { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 14 },
+  coverBottomText: { fontSize: TYPE.footer, color: COLORS.faint, letterSpacing: 0.3 },
 
-  // Section heading
+  // ── Section structure ──
   sectionBlock: { marginBottom: SPACING.sectionGap },
-  sectionHeadingRow: { flexDirection: "row", alignItems: "center", marginBottom: SPACING.headingGap },
-  sectionHeading: {
-    fontSize: TYPE.sectionHeading,
-    fontFamily: FONTS.bold,
-    color: COLORS.muted,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  sectionHeadingLine: { flex: 1, height: 1, backgroundColor: COLORS.border, marginLeft: 10 },
+  headingRow: { flexDirection: "row", alignItems: "center", marginBottom: SPACING.headingGap },
+  headingLine: { flex: 1, height: 0.75, backgroundColor: COLORS.border, marginLeft: 10 },
 
-  // Body text
-  bodyText: { fontSize: TYPE.body, color: COLORS.body, lineHeight: 1.65 },
-  bodyParagraph: { marginBottom: SPACING.lineGap },
+  // ── Body text ──
+  para: { marginBottom: SPACING.paraGap },
 
-  // Bullet list
-  bulletRow: { flexDirection: "row", marginBottom: 5 },
-  bulletDot: { fontSize: TYPE.body, color: COLORS.muted, width: 14, marginTop: 0.5 },
-  bulletText: { flex: 1, fontSize: TYPE.body, color: COLORS.body, lineHeight: 1.55 },
+  // ── Bullets ──
+  bulletRow: { flexDirection: "row", marginBottom: SPACING.bulletGap },
+  bulletDot: { fontSize: TYPE.body, color: COLORS.faint, width: 14, marginTop: 1.5 },
+  bulletText: { flex: 1, fontSize: TYPE.body, color: COLORS.body, lineHeight: 1.7 },
 
-  // Numbered list
-  numberedRow: { flexDirection: "row", marginBottom: 5 },
-  numberedIndex: { fontSize: TYPE.body, color: COLORS.muted, width: 18, marginTop: 0.5 },
-  numberedText: { flex: 1, fontSize: TYPE.body, color: COLORS.body, lineHeight: 1.55 },
-
-  // Table
+  // ── Table ──
   table: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 3 },
   tableHeaderRow: { flexDirection: "row", backgroundColor: COLORS.subtle, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   tableRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: COLORS.border },
   tableRowLast: { flexDirection: "row" },
-  tableHeaderCell: { fontSize: TYPE.tableHeader, fontFamily: FONTS.bold, color: COLORS.muted, paddingHorizontal: 10, paddingVertical: 7, textTransform: "uppercase", letterSpacing: 0.5 },
-  tableCell: { fontSize: TYPE.tableCell, color: COLORS.body, paddingHorizontal: 10, paddingVertical: 8 },
-  tableCellMuted: { fontSize: TYPE.tableCell, color: COLORS.muted, paddingHorizontal: 10, paddingVertical: 8 },
-  tableCellBold: { fontSize: TYPE.tableCell, fontFamily: FONTS.bold, color: COLORS.black, paddingHorizontal: 10, paddingVertical: 8 },
-  tableColFlex: { flex: 1 },
-  tableColPrice: { width: 90 },
-  tableColNotes: { flex: 1 },
-  tableColDuration: { width: 90 },
+  thItem: { flex: 2, fontSize: TYPE.tableHeader, fontFamily: FONTS.bold, color: COLORS.muted, paddingHorizontal: 12, paddingVertical: 8, textTransform: "uppercase", letterSpacing: 0.6 },
+  thPrice: { width: 90, fontSize: TYPE.tableHeader, fontFamily: FONTS.bold, color: COLORS.muted, paddingHorizontal: 12, paddingVertical: 8, textTransform: "uppercase", letterSpacing: 0.6, textAlign: "right" },
+  thNotes: { flex: 1, fontSize: TYPE.tableHeader, fontFamily: FONTS.bold, color: COLORS.muted, paddingHorizontal: 12, paddingVertical: 8, textTransform: "uppercase", letterSpacing: 0.6 },
+  tdItem: { flex: 2, fontSize: TYPE.tableCell, color: COLORS.body, paddingHorizontal: 12, paddingVertical: 9 },
+  tdPrice: { width: 90, fontSize: TYPE.tableCell, fontFamily: FONTS.bold, color: COLORS.black, paddingHorizontal: 12, paddingVertical: 9, textAlign: "right" },
+  tdNotes: { flex: 1, fontSize: TYPE.tableCell, color: COLORS.muted, paddingHorizontal: 12, paddingVertical: 9 },
 
-  // Timeline
-  timelineRow: { flexDirection: "row", marginBottom: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  timelineRowLast: { flexDirection: "row", marginBottom: 0 },
-  timelineIndex: { width: 22, height: 22, borderRadius: 11, backgroundColor: COLORS.subtle, alignItems: "center", justifyContent: "center", marginRight: 12, marginTop: 1 },
-  timelineIndexText: { fontSize: 8, fontFamily: FONTS.bold, color: COLORS.muted },
-  timelineContent: { flex: 1 },
-  timelinePhase: { fontSize: TYPE.body, fontFamily: FONTS.bold, color: COLORS.black, marginBottom: 2 },
-  timelineDuration: { fontSize: TYPE.small, color: COLORS.muted, marginBottom: 2 },
-  timelineDesc: { fontSize: TYPE.small, color: COLORS.body },
+  // ── Timeline ──
+  timelineItem: { flexDirection: "row", marginBottom: 14 },
+  timelineItemLast: { flexDirection: "row" },
+  timelineBadge: { width: 24, height: 24, borderRadius: 12, backgroundColor: COLORS.subtle, borderWidth: 1, borderColor: COLORS.border, alignItems: "center", justifyContent: "center", marginRight: 14, marginTop: 1, flexShrink: 0 },
+  timelineBadgeText: { fontSize: 8.5, fontFamily: FONTS.bold, color: COLORS.muted },
+  timelineBody: { flex: 1 },
+  timelinePhase: { fontSize: TYPE.body, fontFamily: FONTS.bold, color: COLORS.black, marginBottom: 3 },
+  timelineDuration: { fontSize: TYPE.small, color: COLORS.muted, marginBottom: 3 },
+  timelineDesc: { fontSize: TYPE.small, color: COLORS.body, lineHeight: 1.55 },
 
-  // Footer
+  // ── Footer ──
   footer: {
     position: "absolute",
     bottom: 28,
@@ -109,157 +90,154 @@ const s = StyleSheet.create({
     right: SPACING.pagePaddingH,
     flexDirection: "row",
     justifyContent: "space-between",
-    borderTopWidth: 1,
+    borderTopWidth: 0.75,
     borderTopColor: COLORS.border,
-    paddingTop: 8,
+    paddingTop: 9,
   },
-  footerText: { fontSize: TYPE.footer, color: COLORS.muted },
-  footerPage: { fontSize: TYPE.footer, color: COLORS.muted },
+  footerLeft: { fontSize: TYPE.footer, color: COLORS.faint, letterSpacing: 0.3 },
+  footerRight: { fontSize: TYPE.footer, color: COLORS.faint },
 })
 
-// ─── Content parsers (mirrors workspace editor) ───────────────────────────────
+// ─── Parsers ──────────────────────────────────────────────────────────────────
 
 function parsePricing(content: string) {
-  return content
-    .split("\n")
-    .filter((l) => l.trim())
-    .map((line) => {
-      const [item = "", price = "", notes = ""] = line.split("|").map((s) => s.trim())
-      return { item, price, notes }
-    })
+  return content.split("\n").filter((l) => l.trim()).map((line) => {
+    const parts = line.split("|").map((x) => x.trim())
+    return { item: parts[0] ?? "", price: parts[1] ?? "", notes: parts[2] ?? "" }
+  })
 }
 
 function parseTimeline(content: string) {
-  return content
-    .split("\n")
-    .filter((l) => l.trim())
-    .map((line) => {
-      const [phase = "", duration = "", description = ""] = line.split("|").map((s) => s.trim())
-      return { phase, duration, description }
-    })
+  return content.split("\n").filter((l) => l.trim()).map((line) => {
+    const parts = line.split("|").map((x) => x.trim())
+    return { phase: parts[0] ?? "", duration: parts[1] ?? "", description: parts[2] ?? "" }
+  })
 }
 
-// ─── Section heading shared component ────────────────────────────────────────
+// ─── Style-aware section wrapper ──────────────────────────────────────────────
 
-function SectionHeading({ title }: { title: string }) {
+function Section({
+  title,
+  visualStyle,
+  children,
+}: {
+  title: string
+  visualStyle: PdfVisualStyleKey
+  children: React.ReactNode
+}) {
+  const t = PDF_VISUAL_STYLES[visualStyle] ?? PDF_VISUAL_STYLES.CLEAN
   return (
-    <View style={s.sectionHeadingRow}>
-      <Text style={s.sectionHeading}>{title}</Text>
-      <View style={s.sectionHeadingLine} />
+    <View style={[s.sectionBlock, t.container as any]}>
+      <View style={s.headingRow}>
+        <Text style={t.headingText as any}>{title}</Text>
+        {t.showHeadingLine && <View style={s.headingLine} />}
+      </View>
+      {children}
     </View>
   )
 }
 
-// ─── Text section (most section types) ───────────────────────────────────────
+// ─── Content renderers ────────────────────────────────────────────────────────
 
-function TextSection({ title, content }: { title: string; content: string }) {
+function BodyText({ content, style }: { content: string; style: any }) {
   const paragraphs = content.split("\n").filter((l) => l.trim())
   if (!paragraphs.length) return null
   return (
-    <View style={s.sectionBlock}>
-      <SectionHeading title={title} />
+    <>
       {paragraphs.map((para, i) => (
-        <Text key={i} style={[s.bodyText, i < paragraphs.length - 1 ? s.bodyParagraph : {}]}>
+        <Text key={i} style={[style, i < paragraphs.length - 1 ? s.para : {}]}>
           {para}
         </Text>
       ))}
-    </View>
+    </>
   )
 }
 
-// ─── Bullet section (SCOPE_OF_WORK, NEXT_STEPS) ───────────────────────────────
-
-function BulletSection({ title, content }: { title: string; content: string }) {
-  const lines = content.split("\n").filter((l) => l.trim())
-  if (!lines.length) return null
+function BulletList({ content, style }: { content: string; style: any }) {
+  const lines = content.split("\n").filter((l) => l.trim()).map((l) => l.replace(/^[-•·]\s*/, ""))
   return (
-    <View style={s.sectionBlock}>
-      <SectionHeading title={title} />
+    <>
       {lines.map((line, i) => (
         <View key={i} style={s.bulletRow}>
-          <Text style={s.bulletDot}>·</Text>
-          <Text style={s.bulletText}>{line.replace(/^-\s*/, "")}</Text>
+          <Text style={[s.bulletDot, style]}>–</Text>
+          <Text style={[s.bulletText, style]}>{line}</Text>
+        </View>
+      ))}
+    </>
+  )
+}
+
+function PricingTable({ content }: { content: string }) {
+  const rows = parsePricing(content).filter((r) => r.item)
+  if (!rows.length) return null
+  return (
+    <View style={s.table}>
+      <View style={s.tableHeaderRow}>
+        <Text style={s.thItem}>Item</Text>
+        <Text style={s.thPrice}>Price</Text>
+        <Text style={s.thNotes}>Notes</Text>
+      </View>
+      {rows.map((row, i) => (
+        <View key={i} style={i === rows.length - 1 ? s.tableRowLast : s.tableRow}>
+          <Text style={s.tdItem}>{row.item}</Text>
+          <Text style={s.tdPrice}>{row.price}</Text>
+          <Text style={s.tdNotes}>{row.notes}</Text>
         </View>
       ))}
     </View>
   )
 }
 
-// ─── Pricing section ──────────────────────────────────────────────────────────
-
-function PricingSection({ title, content }: { title: string; content: string }) {
-  const rows = parsePricing(content)
+function TimelineList({ content }: { content: string }) {
+  const rows = parseTimeline(content).filter((r) => r.phase)
   if (!rows.length) return null
   return (
-    <View style={s.sectionBlock}>
-      <SectionHeading title={title} />
-      <View style={s.table}>
-        {/* Header */}
-        <View style={s.tableHeaderRow}>
-          <Text style={[s.tableHeaderCell, s.tableColFlex]}>Item</Text>
-          <Text style={[s.tableHeaderCell, s.tableColPrice]}>Price</Text>
-          <Text style={[s.tableHeaderCell, s.tableColNotes]}>Notes</Text>
-        </View>
-        {/* Rows */}
-        {rows.map((row, i) => {
-          const isLast = i === rows.length - 1
-          return (
-            <View key={i} style={isLast ? s.tableRowLast : s.tableRow}>
-              <Text style={[s.tableCell, s.tableColFlex]}>{row.item}</Text>
-              <Text style={[s.tableCellBold, s.tableColPrice]}>{row.price}</Text>
-              <Text style={[s.tableCellMuted, s.tableColNotes]}>{row.notes}</Text>
-            </View>
-          )
-        })}
-      </View>
-    </View>
-  )
-}
-
-// ─── Timeline section ─────────────────────────────────────────────────────────
-
-function TimelineSection({ title, content }: { title: string; content: string }) {
-  const rows = parseTimeline(content)
-  if (!rows.length) return null
-  return (
-    <View style={s.sectionBlock}>
-      <SectionHeading title={title} />
-      {rows.map((row, i) => {
-        const isLast = i === rows.length - 1
-        return (
-          <View key={i} style={isLast ? s.timelineRowLast : s.timelineRow}>
-            <View style={s.timelineIndex}>
-              <Text style={s.timelineIndexText}>{i + 1}</Text>
-            </View>
-            <View style={s.timelineContent}>
-              <Text style={s.timelinePhase}>{row.phase}</Text>
-              {row.duration ? <Text style={s.timelineDuration}>{row.duration}</Text> : null}
-              {row.description ? <Text style={s.timelineDesc}>{row.description}</Text> : null}
-            </View>
+    <>
+      {rows.map((row, i) => (
+        <View key={i} style={i === rows.length - 1 ? s.timelineItemLast : s.timelineItem}>
+          <View style={s.timelineBadge}>
+            <Text style={s.timelineBadgeText}>{i + 1}</Text>
           </View>
-        )
-      })}
-    </View>
+          <View style={s.timelineBody}>
+            <Text style={s.timelinePhase}>{row.phase}</Text>
+            {row.duration ? <Text style={s.timelineDuration}>{row.duration}</Text> : null}
+            {row.description ? <Text style={s.timelineDesc}>{row.description}</Text> : null}
+          </View>
+        </View>
+      ))}
+    </>
   )
 }
 
 // ─── Section dispatcher ───────────────────────────────────────────────────────
 
-function PdfSectionRenderer({ type, title, content }: { type: string; title: string; content: string }) {
-  switch (type) {
-    case "SCOPE_OF_WORK":
-    case "NEXT_STEPS":
-      return <BulletSection title={title} content={content} />
-    case "PRICING":
-      return <PricingSection title={title} content={content} />
-    case "TIMELINE":
-      return <TimelineSection title={title} content={content} />
-    // COVER is handled separately as its own page
-    case "COVER":
-      return null
-    default:
-      return <TextSection title={title} content={content} />
-  }
+function SectionRenderer({
+  type,
+  title,
+  content,
+  visualStyle,
+}: {
+  type: string
+  title: string
+  content: string
+  visualStyle: PdfVisualStyleKey
+}) {
+  if (!content.trim() || type === "COVER") return null
+  const t = PDF_VISUAL_STYLES[visualStyle] ?? PDF_VISUAL_STYLES.CLEAN
+
+  return (
+    <Section title={title} visualStyle={visualStyle}>
+      {type === "PRICING" ? (
+        <PricingTable content={content} />
+      ) : type === "TIMELINE" ? (
+        <TimelineList content={content} />
+      ) : type === "SCOPE_OF_WORK" || type === "NEXT_STEPS" ? (
+        <BulletList content={content} style={t.contentText} />
+      ) : (
+        <BodyText content={content} style={t.contentText} />
+      )}
+    </Section>
+  )
 }
 
 // ─── Cover page ───────────────────────────────────────────────────────────────
@@ -276,34 +254,32 @@ function CoverPage({
   const date = new Date(proposal.createdAt).toLocaleDateString("en-US", {
     year: "numeric", month: "long", day: "numeric",
   })
-
-  // Optional cover section note
-  const coverSection = proposal.sections.find((s) => s.type === "COVER")
-  const coverNote = coverSection?.content?.trim()
+  const coverNote = proposal.sections.find((s) => s.type === "COVER")?.content?.trim()
 
   return (
     <Page size="A4" style={s.coverPage}>
-      {/* Top: agency tag */}
-      <View style={s.coverTop}>
+      {/* Agency identifier */}
+      <View style={s.coverLogoRow}>
         <Text style={s.coverAgency}>{agencyName.toUpperCase()}</Text>
       </View>
 
-      {/* Center: proposal identity */}
+      {/* Document identity */}
       <View style={s.coverCenter}>
+        <Text style={s.coverEyebrow}>Prepared for</Text>
         <Text style={s.coverCompany}>{companyName}</Text>
         <Text style={s.coverTitle}>{proposal.title}</Text>
         <View style={s.coverDivider} />
-        <Text style={s.coverMeta}>Prepared by {agencyName}</Text>
+        <Text style={s.coverMeta}>By {agencyName}</Text>
         <Text style={s.coverMeta}>{date}</Text>
         {coverNote ? <Text style={s.coverNote}>{coverNote}</Text> : null}
       </View>
 
-      {/* Bottom: contact strip */}
+      {/* Footer strip */}
       <View style={s.coverBottom}>
         <Text style={s.coverBottomText}>
           {[agencyName, business?.contactEmail, business?.website]
             .filter(Boolean)
-            .join("  ·  ")}
+            .join("   ·   ")}
         </Text>
       </View>
     </Page>
@@ -312,12 +288,13 @@ function CoverPage({
 
 // ─── Main document ────────────────────────────────────────────────────────────
 
-interface ProposalPdfDocumentProps {
+export function ProposalPdfDocument({
+  proposal,
+  business,
+}: {
   proposal: ProposalWithSections
   business?: PdfBusinessContext
-}
-
-export function ProposalPdfDocument({ proposal, business }: ProposalPdfDocumentProps) {
+}) {
   const agencyName = business?.agencyName ?? "Outpero"
   const hasCover = proposal.sections.some((s) => s.type === "COVER" && s.isVisible)
   const contentSections = proposal.sections
@@ -331,27 +308,27 @@ export function ProposalPdfDocument({ proposal, business }: ProposalPdfDocumentP
       subject="Business Proposal"
       creator={agencyName}
     >
-      {/* Cover page */}
       {hasCover && <CoverPage proposal={proposal} business={business} />}
 
-      {/* Content page */}
       {contentSections.length > 0 && (
         <Page size="A4" style={s.contentPage}>
           {contentSections.map((section) => (
-            <PdfSectionRenderer
+            <SectionRenderer
               key={section.id}
               type={section.type}
               title={section.title}
               content={section.content}
+              visualStyle={((section as any).visualStyle ?? "CLEAN") as PdfVisualStyleKey}
             />
           ))}
 
-          {/* Footer — renders on every page of this Page */}
           <View style={s.footer} fixed>
-            <Text style={s.footerText}>{agencyName} · Confidential</Text>
+            <Text style={s.footerLeft}>{agencyName}  ·  Confidential</Text>
             <Text
-              style={s.footerPage}
-              render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+              style={s.footerRight}
+              render={({ pageNumber, totalPages }) =>
+                `${pageNumber} / ${totalPages}`
+              }
             />
           </View>
         </Page>

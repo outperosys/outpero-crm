@@ -142,10 +142,14 @@ export async function addProposalTemplateSection(
       templateId,
       type: parsed.data.type,
       title: parsed.data.title,
-      contentTemplate: parsed.data.contentTemplate ?? "",
+      templateText: parsed.data.templateText ?? "",
+      aiInstructions: parsed.data.aiInstructions ?? null,
       order: nextOrder,
       isRequired: parsed.data.isRequired ?? false,
       isAIGenerated: parsed.data.isAIGenerated ?? false,
+      isAIRefinement: parsed.data.isAIRefinement ?? false,
+      visualStyle: parsed.data.visualStyle ?? "CLEAN",
+      layoutType: parsed.data.layoutType ?? "FULL_WIDTH",
     },
   })
 
@@ -156,7 +160,7 @@ export async function addProposalTemplateSection(
 export async function updateProposalTemplateSection(
   id: string,
   templateId: string,
-  data: Partial<ProposalTemplateSectionFormValues> & { contentTemplate?: string }
+  data: Partial<ProposalTemplateSectionFormValues>
 ): Promise<ActionResult<ProposalTemplateSection>> {
   await requireAuth()
 
@@ -165,9 +169,13 @@ export async function updateProposalTemplateSection(
     data: {
       ...(data.title !== undefined && { title: data.title }),
       ...(data.type !== undefined && { type: data.type }),
-      ...(data.contentTemplate !== undefined && { contentTemplate: data.contentTemplate }),
+      ...(data.templateText !== undefined && { templateText: data.templateText }),
+      ...(data.aiInstructions !== undefined && { aiInstructions: data.aiInstructions }),
       ...(data.isRequired !== undefined && { isRequired: data.isRequired }),
       ...(data.isAIGenerated !== undefined && { isAIGenerated: data.isAIGenerated }),
+      ...(data.isAIRefinement !== undefined && { isAIRefinement: data.isAIRefinement }),
+      ...(data.visualStyle !== undefined && { visualStyle: data.visualStyle }),
+      ...(data.layoutType !== undefined && { layoutType: data.layoutType }),
     },
   })
 

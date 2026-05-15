@@ -31,7 +31,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 }
 ```
 
-This applies to `generateMetadata` too. Do NOT destructure params directly.
+Same applies to `searchParams` and `generateMetadata`. Do NOT destructure directly.
 
 ---
 
@@ -82,6 +82,12 @@ npx prisma migrate dev --name <name>
 npx prisma generate
 ```
 
+**Seed data:**
+```bash
+npx tsx prisma/seed.ts
+```
+Seeds: 4 follow-up templates + 4 proposal templates (Full Proposal, Quick Scope, Discovery Proposal, Config Showcase).
+
 ---
 
 ## Prisma Schema — Current State
@@ -92,14 +98,20 @@ enum PipelineStage { NEW_LEAD QUALIFIED DISCOVERY_CALL PROPOSAL_SENT FOLLOW_UP W
 enum Priority { LOW MEDIUM HIGH }
 enum Urgency { LOW MEDIUM HIGH }
 enum ActivityType { CALL MEETING EMAIL PROPOSAL_SENT FOLLOW_UP STATUS_CHANGE NOTE }
+enum ProposalSectionType { COVER EXECUTIVE_SUMMARY PROBLEM_STATEMENT PROPOSED_SOLUTION SCOPE_OF_WORK TIMELINE PRICING ABOUT_US TERMS NEXT_STEPS CUSTOM }
+enum ProposalStatus { DRAFT REVIEW SENT ACCEPTED DECLINED }
 
-model Profile     — id, userId, name, email, role, timestamps
-model Lead        — full lead fields (see schema.prisma), relations: noteEntries, activities, tasks, followUps
-model Note        — id, leadId, content, createdBy, timestamps. Cascade on lead delete.
-model Activity    — id, leadId, type (ActivityType), description, createdBy, createdAt. Cascade.
-model Task        — id, leadId, title, dueDate, completed, completedAt, assignedTo, timestamps. Cascade.
-model FollowUp    — id, leadId, title, notes, dueDate, completed, completedAt, assignedTo, templateId, createdBy, timestamps. Cascade.
+model Profile          — id, userId, name, email, role, timestamps
+model Lead             — full lead fields, relations: noteEntries, activities, tasks, followUps, proposals
+model Note             — id, leadId, content, createdBy, timestamps. Cascade on lead delete.
+model Activity         — id, leadId, type (ActivityType), description, createdBy, createdAt. Cascade.
+model Task             — id, leadId, title, dueDate, completed, completedAt, assignedTo, timestamps. Cascade.
+model FollowUp         — id, leadId, title, notes, dueDate, completed, completedAt, assignedTo, templateId, createdBy, timestamps. Cascade.
 model FollowUpTemplate — id, name (unique), title, notes, timestamps.
+model ProposalTemplate         — id, name (unique), description, isDefault, timestamps. Has sections + proposals.
+model ProposalTemplateSection  — id, templateId, type, title, templateText, aiInstructions?, order, isRequired, isAIGenerated, isAIRefinement, visualStyle (VisualStyle), layoutType (LayoutType), metadata (Json?), timestamps.
+model Proposal                 — id, leadId, templateId?, title, status (ProposalStatus), validUntil?, totalValue?, createdBy?, sentAt?, timestamps. Cascade on lead delete.
+model ProposalSection          — id, proposalId, type, title, content, order, isAIGenerated, isVisible, visualStyle (VisualStyle), layoutType (LayoutType), metadata (Json?), timestamps. Cascade on proposal delete.
 ```
 
 Full schema at: `prisma/schema.prisma`
@@ -110,100 +122,115 @@ Full schema at: `prisma/schema.prisma`
 
 ```
 app/
-  layout.tsx                    — root layout
+  layout.tsx
   page.tsx                      — redirects to /dashboard
-  (auth)/
-    login/page.tsx              — login page
+  (auth)/login/page.tsx
   (crm)/
     layout.tsx                  — sidebar + topbar wrapper
     dashboard/page.tsx          — placeholder
     leads/
-      page.tsx                  — leads table with search/filter/sort
-      loading.tsx               — skeleton
+      page.tsx                  — leads table (search/filter/sort)
+      loading.tsx
       [id]/
-        page.tsx                — lead detail workspace (parallel fetch 6 things)
-        loading.tsx             — skeleton
+        page.tsx                — lead detail workspace (parallel fetch: lead, notes, activities, tasks, followUps, templates)
+        loading.tsx
     follow-ups/
-      page.tsx                  — follow-up dashboard (Overdue/Today/Upcoming/Completed)
-      loading.tsx               — skeleton
+      page.tsx                  — dashboard: Overdue / Due Today / Upcoming / Completed
+      loading.tsx
+    proposals/
+      page.tsx                  — proposals list with status badges
+      new/page.tsx              — lead + template selector → triggers generateProposal action
+      [id]/page.tsx             — proposal workspace editor (title, status, sections)
+      [id]/loading.tsx
+    templates/
+      page.tsx                  — proposal templates grid
+      [id]/page.tsx             — template editor (sections, reorder, AI flags, placeholders)
+      [id]/loading.tsx
     pipeline/page.tsx           — placeholder
-    proposals/page.tsx          — placeholder
     invoices/page.tsx           — placeholder
     clients/page.tsx            — placeholder
     tasks/page.tsx              — placeholder
-    templates/page.tsx          — placeholder
     settings/page.tsx           — placeholder
 
 actions/
-  auth.ts         — login(prevState, formData), logout()
-  leads.ts        — getLeads, getLead, createLead, updateLead, deleteLead
-  notes.ts        — getNotes, createNote, updateNote, deleteNote
-  activities.ts   — getActivities, createActivity, deleteActivity
-  tasks.ts        — getTasks, createTask, toggleTask, deleteTask
-  follow-ups.ts   — getFollowUps, getLeadFollowUps, createFollowUp, completeFollowUp, deleteFollowUp, getTemplates
-  ai.ts           — generateFollowUpDrafts(leadId, options) → ActionResult<FollowUpVariation[]>
+  auth.ts               — login(prevState, formData), logout()
+  leads.ts              — getLeads, getLead, createLead, updateLead, deleteLead
+  notes.ts              — getNotes, createNote, updateNote, deleteNote
+  activities.ts         — getActivities, createActivity, deleteActivity
+  tasks.ts              — getTasks, createTask, toggleTask, deleteTask
+  follow-ups.ts         — getFollowUps, getLeadFollowUps, createFollowUp, completeFollowUp, deleteFollowUp, getTemplates
+  proposals.ts          — getProposals, getProposal, getProposalForWorkspace, getLeadProposals, updateProposalTitle, updateProposalStatus, updateProposalSection, reorderProposalSection, toggleProposalSectionVisibility, addProposalSection, deleteProposal
+  proposal-templates.ts — getProposalTemplates, getProposalTemplate, createProposalTemplate, updateProposalTemplate, deleteProposalTemplate, addProposalTemplateSection, updateProposalTemplateSection, removeProposalTemplateSection, reorderProposalTemplateSection
+  ai.ts                 — generateFollowUpDrafts(leadId, options), generateProposal(leadId, templateId, options)
 
 lib/
-  prisma.ts                   — Prisma singleton
-  utils.ts                    — cn(), formatDate(), formatCurrency()
-  supabase/
-    server.ts                 — createClient() for Server Components + Actions
-    client.ts                 — createBrowserClient() for Client Components
+  prisma.ts
+  utils.ts                      — cn(), formatDate(), formatCurrency()
+  supabase/server.ts, client.ts
   validations/
-    lead.ts                   — leadSchema (Zod), LeadFormValues, constants (PIPELINE_STAGES, PRIORITIES, etc.)
-    note.ts                   — noteSchema
-    activity.ts               — activitySchema
-    task.ts                   — taskSchema
-    follow-up.ts              — followUpSchema, FollowUpFormValues
+    lead.ts, note.ts, activity.ts, task.ts, follow-up.ts
+    proposal-template.ts        — proposalTemplateSchema, proposalTemplateSectionSchema
   ai/
-    types.ts                  — FollowUpTone/Length/Channel/Style, FollowUpGenerationOptions, FollowUpVariation, LeadAIContext, BusinessContext
-    openai.ts                 — singleton OpenAI client + AI_MODEL constant
+    types.ts                    — FollowUpTone/Length/Channel/Style, FollowUpGenerationOptions, FollowUpVariation, LeadAIContext, BusinessContext
+    openai.ts                   — singleton OpenAI client + AI_MODEL constant
+    placeholder.ts              — resolvePlaceholders(template, ctx), formatProposalDate(). Pure sync. Handles {{lead.name}} etc.
     prompts/
-      follow-up.ts            — buildFollowUpSystemPrompt(business?), buildFollowUpUserPrompt(lead, activities, options, followUpTitle?)
+      follow-up.ts              — buildFollowUpSystemPrompt(business?), buildFollowUpUserPrompt(lead, activities, options, followUpTitle?)
+      proposal.ts               — buildProposalSystemPrompt(business?), buildProposalRefinementSystemPrompt(business?), buildProposalSectionPrompt(type, lead, notes, activities, followUpTitles, customInstructions?, aiInstructions?), buildProposalRefinementPrompt(templateText, lead, notes, activities, aiInstructions?)
+  proposal/
+    types.ts                    — VisualStyleKey, LayoutTypeKey, SectionVisualConfig, AccentColorKey, etc.
+    presets.ts                  — VISUAL_STYLE_CLASSES, LAYOUT_TYPE_CLASSES, VISUAL_STYLE_LABELS, LAYOUT_TYPE_LABELS, ACCENT_COLORS
+    renderer.tsx                — SectionContent, SectionStyleWrapper, TextContent, CoverContent, PricingContent, TimelineContent, parsePricingContent, serializePricing, parseTimelineContent, serializeTimeline
+  pdf/
+    tokens.ts                   — COLORS, FONTS, SPACING, TYPE, PDF_VISUAL_STYLES (PdfStyleTokens per style key). All values in pt, PDF-safe hex only.
+    proposal-document.tsx       — ProposalPdfDocument (react-pdf). Style-aware: reads section.visualStyle to apply distinct PDF tokens per section. Exports PdfBusinessContext.
 
 components/
-  ui/                         — shadcn primitives (button, input, label, dialog, sheet, sidebar, etc.)
-  auth/
-    login-form.tsx            — login form (Client Component, useActionState)
-  layout/
-    app-sidebar.tsx           — nav sidebar (Client, usePathname)
-    topbar.tsx                — top bar
+  ui/                           — shadcn primitives
+  auth/login-form.tsx
+  layout/app-sidebar.tsx, topbar.tsx
   leads/
-    lead-form.tsx             — full lead form (react-hook-form + Zod)
-    create-lead-dialog.tsx    — Dialog wrapper for creating leads
-    edit-lead-dialog.tsx      — Dialog wrapper for editing leads
-    delete-lead-dialog.tsx    — Alert dialog for deleting (onSuccess? prop for navigation)
-    leads-table-client.tsx    — Client: search/filter/sort, single shared edit+delete dialog
+    lead-form.tsx, create-lead-dialog.tsx, edit-lead-dialog.tsx, delete-lead-dialog.tsx, leads-table-client.tsx
   lead-detail/
-    edit-delete-buttons.tsx   — Client wrapper managing edit/delete dialog state
-    follow-up-banner.tsx      — Server: overdue/today/soon banner using lead.nextFollowUp
-    overview-card.tsx         — Lead fields display
-    notes-section.tsx         — Server wrapper for notes list + add form
-    add-note-form.tsx         — Client: inline note creation
-    note-item.tsx             — Note display with edit/delete
-    activities-section.tsx    — Server wrapper for activity list + add form
-    add-activity-form.tsx     — Client: activity type + description form
-    activity-item.tsx         — Activity display
-    delete-activity-button.tsx — Client delete button
-    tasks-section.tsx         — Server wrapper for tasks list + add form
-    add-task-form.tsx         — Client: inline task creation (title + date + assignee)
-    task-item.tsx             — Client: checkbox toggle + delete
-    lead-follow-ups-section.tsx — Server: renders pending + completed follow-ups, "+ Add" button
-    lead-follow-up-item.tsx   — Client: follow-up row with Sparkles (AI) + Complete + Delete buttons
+    edit-delete-buttons.tsx, follow-up-banner.tsx, overview-card.tsx
+    notes-section.tsx, add-note-form.tsx, note-item.tsx
+    activities-section.tsx, add-activity-form.tsx, activity-item.tsx, delete-activity-button.tsx
+    tasks-section.tsx, add-task-form.tsx, task-item.tsx
+    lead-follow-ups-section.tsx — Server: pending + completed list, "+ Add" button
+    lead-follow-up-item.tsx     — Client: Sparkles (AI Sheet) + Complete + Delete
   follow-ups/
-    follow-up-card.tsx        — Client: dashboard card with Sparkles + Complete + Delete
-    create-follow-up-dialog.tsx — Client: modal form (lead selector + template selector + fields). leadId prop hides lead selector when pre-filled.
-    complete-follow-up-dialog.tsx — Client: mark complete + optional next follow-up form (title, date, assignee, notes)
-    ai-generator-sheet.tsx    — Client: right-side Sheet. Controls (channel/tone/length/style + custom intent) → Generate → 3 copy-ready message variations
+    follow-up-card.tsx          — Client: card with Sparkles + Complete + Delete
+    create-follow-up-dialog.tsx — leadId prop hides lead selector when pre-filled
+    complete-follow-up-dialog.tsx — mark complete + next follow-up form (title, date, assignee, notes)
+    ai-generator-sheet.tsx      — right-side Sheet: channel/tone/length/style controls → Generate → 3 variations with Copy buttons
+  proposals/
+    generate-proposal-form.tsx  — Client: lead selector + template selector + custom instructions → calls generateProposal
+    workspace/
+      proposal-workspace.tsx        — Client: renders ProposalSectionCards, manages section state
+      proposal-header-actions.tsx   — Client: inline title edit + status dropdown
+      proposal-section-card.tsx     — Client: section content display + edit mode
+  proposal-templates/
+    template-card.tsx           — Server: card with name, section count, AI count, link to editor
+    create-template-dialog.tsx  — Client: create new template modal
+    edit-template-header.tsx    — Client: inline name/description editing
+    template-section-item.tsx   — Client: section row with ↑↓ reorder + edit panel (templateText, aiInstructions, visualStyle, layoutType selectors, AI mode badges)
+    add-section-form.tsx        — Client: add section form with AI mode toggle (Static / AI Refine / AI Generate), visualStyle + layoutType selectors, auto-suggests presets by section type
 
-types/
-  index.ts      — ActionResult<T>, Profile, Role
-
-middleware.ts   — auth guard, redirects
+types/index.ts      — ActionResult<T>, Profile, Role
+middleware.ts       — auth guard, redirects
 prisma/
   schema.prisma
-  seed.ts       — seeds 4 FollowUpTemplates (run: npx tsx prisma/seed.ts)
+  seed.ts           — follow-up templates + proposal templates (run: npx tsx prisma/seed.ts)
   migrations/
+    20260512113556_add_lead_model
+    20260512121253_add_notes_activities_tasks
+    20260512125115_add_follow_ups
+    20260513170440_add_proposal_system
+    20260514000001_refine_proposal_sections
+
+app/
+  api/
+    proposals/[id]/pdf/route.ts   — GET: renders proposal to PDF via react-pdf, returns application/pdf
 ```
 
 ---
@@ -224,38 +251,104 @@ startTransition(async () => { await someAction() })
 ```
 
 ### Revalidation pattern
-Actions that modify a lead revalidate both `/leads` and `/leads/${id}`. Follow-up actions also revalidate `/follow-ups`.
+Actions that modify a lead revalidate `/leads` and `/leads/${id}`. Follow-up actions also revalidate `/follow-ups`. Proposal actions revalidate `/proposals` and `/proposals/${id}`.
 
 ### Zod validations — NO `.default()`
-Zod v3 is used. `.default()` makes input/output types differ, breaking `react-hook-form` v7.75.0. All defaults live in the form's `defaultValues`, not the schema.
+Zod v3. `.default()` makes input/output types differ, breaking `react-hook-form` v7.75.0. All defaults live in the form's `defaultValues`, not the schema.
 
-### Form imports — shadcn Form component
-The `Form` component was hand-built (not in shadcn registry). Uses `Slot.Root` from `radix-ui` umbrella package — NOT `@radix-ui/react-slot` or just `Slot`.
+### Form component import
+Hand-built shadcn Form component (not in registry). Uses `Slot.Root` from `radix-ui` umbrella package — NOT `@radix-ui/react-slot` or plain `Slot`.
 
 ---
 
 ## AI Infrastructure
 
-`actions/ai.ts` — `generateFollowUpDrafts(leadId, options)`:
-- Fetches lead fields + last 5 activities from DB
+### Follow-up generator (`actions/ai.ts` → `generateFollowUpDrafts`)
+- Fetches lead + last 5 activities from DB
 - Calls `buildFollowUpSystemPrompt()` + `buildFollowUpUserPrompt()`
 - Uses `gpt-4o-mini` with `response_format: { type: "json_object" }`
-- Returns `ActionResult<FollowUpVariation[]>` (3 variations by default)
+- Returns `ActionResult<FollowUpVariation[]>` (3 variations)
 
-`lib/ai/types.ts` has a `BusinessContext` interface reserved for a future Settings layer — pass it to `buildFollowUpSystemPrompt(business?)` when that's built.
+### Proposal generator (`actions/ai.ts` → `generateProposal`)
+- Fetches lead, notes, activities, follow-ups, template (all parallel)
+- Creates `Proposal` record (DRAFT) in DB
+- Three section modes — checked per section:
+  - **Mode C** (`isAIGenerated=false, isAIRefinement=false`): `resolvePlaceholders()` only — no AI
+  - **Mode B** (`isAIRefinement=true`): `buildProposalRefinementPrompt(templateText, ...)` → OpenAI at temperature 0.6. Fallback: uses original templateText
+  - **Mode A** (`isAIGenerated=true`): `buildProposalSectionPrompt(type, ...)` → OpenAI at temperature 0.7. Fallback: "[Generation failed]" message
+- All AI sections run in `Promise.all` (parallel). Non-AI sections resolve synchronously.
+- Per-section AI failure is graceful — proposal still created with fallback content
+- Returns `ActionResult<string>` (proposal ID) → client redirects to `/proposals/${id}`
+- `visualStyle` and `layoutType` are copied from template section to created ProposalSection
 
-Future AI features (proposals, emails, summaries) follow the same pattern: add `lib/ai/prompts/<domain>.ts`, add action to `actions/ai.ts`.
+### Placeholder system (`lib/ai/placeholder.ts`)
+Pure sync function. Resolves `{{lead.name}}`, `{{lead.company}}`, `{{lead.service}}`, `{{lead.problem}}`, `{{lead.industry}}`, `{{proposal.date}}`, `{{proposal.validity}}`, `{{agency.name}}` in template content strings.
+
+### `BusinessContext` slot
+`lib/ai/types.ts` exports `BusinessContext { agencyName?, services?, brandTone?, customInstructions? }`. Both `buildFollowUpSystemPrompt(business?)` and `buildProposalSystemPrompt(business?)` accept it as optional. When the Settings module is built, pass populated context — no prompt restructuring needed.
+
+### Adding future AI domains
+1. Add `lib/ai/prompts/<domain>.ts` with system + user prompt builders
+2. Add action to `actions/ai.ts`
+3. Keep OpenAI calls out of components entirely
 
 ---
 
-## Follow-up System — How It Works
+## Follow-up System
 
-- `FollowUp` records are created per lead with a `dueDate`.
-- Creating or completing a follow-up calls `syncLeadNextFollowUp(leadId)` which updates `lead.nextFollowUp` to the earliest pending follow-up date.
-- `lead.nextFollowUp` drives the `FollowUpBanner` on the lead detail page (overdue/today/soon).
-- Completing a follow-up: marks done, logs `Activity(FOLLOW_UP)`, sets `lead.lastContacted = now`. Optional: creates next follow-up with full config.
-- `/follow-ups` dashboard partitions all follow-ups into: Overdue / Due Today / Upcoming / Recently Completed (last 20).
-- 4 templates seeded: "Proposal Follow-up", "Discovery Reminder", "No Response", "Re-engagement".
+- `FollowUp` records per lead with `dueDate`.
+- `syncLeadNextFollowUp(leadId)` — internal helper in `actions/follow-ups.ts`. Updates `lead.nextFollowUp` to earliest pending follow-up. Called on create, complete, delete.
+- `lead.nextFollowUp` drives the `FollowUpBanner` on lead detail (overdue/today/soon).
+- Completing: marks done, logs `Activity(FOLLOW_UP)`, sets `lead.lastContacted = now`. Optional next follow-up with full config (title, date, assignee, notes).
+- `/follow-ups` dashboard: Overdue / Due Today / Upcoming / Recently Completed (last 20).
+- AI Sheet (`ai-generator-sheet.tsx`): channel → tone → length → style controls, optional custom intent, generates 3 message variations with per-variation Copy buttons.
+- 4 follow-up templates seeded.
+
+---
+
+## Proposal System
+
+### Flow
+```
+/proposals/new → select lead + template → generateProposal action → /proposals/{id} workspace
+```
+
+### Proposal workspace (`/proposals/[id]`)
+- Title: inline editable (`updateProposalTitle`)
+- Status: dropdown (DRAFT → REVIEW → SENT → ACCEPTED → DECLINED)
+- Sections: each section is a card with view/edit mode. Edit saves via `updateProposalSection`.
+- Section reorder: ↑↓ arrows (`reorderProposalSection`)
+- Section visibility: toggle hide/show (`toggleProposalSectionVisibility`)
+- Add custom section: `addProposalSection`
+
+### Template editor (`/templates/[id]`)
+- Inline name/description editing
+- Section list with ↑↓ reorder, type, AI flag, content template (for non-AI sections), required flag
+- Placeholder reference panel shown at bottom
+- Add section form at bottom of list
+
+### Visual section system
+Each section has `visualStyle` (CLEAN | MODERN | HIGHLIGHT | MINIMAL | HERO | TWO_COLUMN) and `layoutType` (FULL_WIDTH | CENTERED | TWO_COLUMN | CARD). These are stored as enums — never raw CSS. The renderer (`lib/proposal/renderer.tsx`) maps them to Tailwind classes. PDF rendering will map the same enums to react-pdf style objects.
+
+`SectionVisualConfig` (stored in `metadata.visualConfig`) provides micro-overrides: alignment, spacing, accentColor, showDivider, emphasisLevel, width — all named values, no arbitrary CSS.
+
+### AI section modes (per section in ProposalTemplateSection)
+| isAIGenerated | isAIRefinement | Mode | What happens |
+|:---:|:---:|---|---|
+| false | false | C — Static | Placeholder resolution only |
+| false | true | B — Refine | AI personalizes `templateText` using lead context + `aiInstructions` |
+| true | false | A — Generate | AI writes section from scratch using lead context + `aiInstructions` |
+
+`aiInstructions` on the template section is a per-section AI prompt override — takes priority over default section instructions in the prompt builder.
+
+### PDF export
+Route `GET /api/proposals/[id]/pdf` — fetches proposal + sections, renders via `ProposalPdfDocument`, streams as `application/pdf`. Triggered by "Export PDF" button in `proposal-header-actions.tsx`. The PDF renderer reads each section's `visualStyle` field and applies distinct react-pdf styles from `PDF_VISUAL_STYLES` in `lib/pdf/tokens.ts`. No Tailwind — all pt values and hex colors.
+
+### Seeded proposal templates
+- **Full Proposal** (default): Cover (HERO, static), Executive Summary (CLEAN, generate), Problem Statement (HIGHLIGHT, refine), Proposed Solution (CLEAN, generate), Scope of Work (MODERN, refine), Timeline (static), Pricing (static), About Us (MINIMAL, static), Terms (MINIMAL, static), Next Steps (MODERN, generate)
+- **Quick Scope**: Cover, Scope of Work (refine), Pricing, Next Steps (generate)
+- **Discovery Proposal**: Cover, What We Heard (HIGHLIGHT, refine), How We Can Help (generate), Next Steps (generate)
+- **Config Showcase**: One section per visual style + AI mode combo — use to verify PDF rendering of all style presets
 
 ---
 
@@ -275,7 +368,7 @@ OPENAI_API_KEY=sk-...
 
 Optional:
 ```
-OPENAI_MODEL=gpt-4o-mini   # override AI model
+OPENAI_MODEL=gpt-4o-mini
 ```
 
 ---
@@ -290,12 +383,12 @@ OPENAI_MODEL=gpt-4o-mini   # override AI model
 | Lead Detail (overview, notes, activities, tasks, follow-ups) | Complete |
 | Follow-ups Dashboard | Complete |
 | AI Follow-up Generator | Complete |
+| Proposals (list, generate, workspace editor) | Complete |
+| Proposal Templates (CRUD, section management) | Complete |
 | Pipeline (Kanban) | Placeholder page only |
-| Proposals | Placeholder page only |
 | Invoices | Placeholder page only |
 | Clients | Placeholder page only |
-| Tasks (global) | Placeholder page only |
-| Templates | Placeholder page only |
+| Tasks (global view) | Placeholder page only |
 | Settings | Placeholder page only |
 | Dashboard stats | Placeholder page only |
 
@@ -303,4 +396,4 @@ OPENAI_MODEL=gpt-4o-mini   # override AI model
 
 ## Windows-Specific Issue
 
-On Windows, Prisma's query engine DLL (`query_engine-windows.dll.node`) is locked by the dev server process. Before running `prisma generate` or `prisma migrate dev`, **kill the dev server** (the large node.exe process, ~800MB+). Restart dev server after.
+On Windows, Prisma's query engine DLL (`query_engine-windows.dll.node`) is locked by the dev server process. Before running `prisma generate` or `prisma migrate dev`, kill the dev server (the large node.exe process, ~800MB+). Restart after.

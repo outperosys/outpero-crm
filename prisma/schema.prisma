@@ -47,6 +47,22 @@ enum ActivityType {
   NOTE
 }
 
+enum VisualStyle {
+  CLEAN
+  MODERN
+  HIGHLIGHT
+  MINIMAL
+  HERO
+  TWO_COLUMN
+}
+
+enum LayoutType {
+  FULL_WIDTH
+  CENTERED
+  TWO_COLUMN
+  CARD
+}
+
 enum ProposalSectionType {
   COVER
   EXECUTIVE_SUMMARY
@@ -227,17 +243,21 @@ model ProposalTemplate {
 }
 
 model ProposalTemplateSection {
-  id              String              @id @default(cuid())
-  templateId      String              @map("template_id")
-  type            ProposalSectionType
-  title           String
-  contentTemplate String              @default("") @map("content_template")
-  order           Int
-  isRequired      Boolean             @default(true) @map("is_required")
-  isAIGenerated   Boolean             @default(false) @map("is_ai_generated")
-  metadata        Json?
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime            @updatedAt @map("updated_at")
+  id             String              @id @default(cuid())
+  templateId     String              @map("template_id")
+  type           ProposalSectionType
+  title          String
+  templateText   String              @default("") @map("template_text")
+  aiInstructions String?             @map("ai_instructions")
+  order          Int
+  isRequired     Boolean             @default(true) @map("is_required")
+  isAIGenerated  Boolean             @default(false) @map("is_ai_generated")
+  isAIRefinement Boolean             @default(false) @map("is_ai_refinement")
+  visualStyle    VisualStyle         @default(CLEAN) @map("visual_style")
+  layoutType     LayoutType          @default(FULL_WIDTH) @map("layout_type")
+  metadata       Json?
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
 
   template ProposalTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
@@ -273,6 +293,8 @@ model ProposalSection {
   order         Int
   isAIGenerated Boolean             @default(false) @map("is_ai_generated")
   isVisible     Boolean             @default(true) @map("is_visible")
+  visualStyle   VisualStyle         @default(CLEAN) @map("visual_style")
+  layoutType    LayoutType          @default(FULL_WIDTH) @map("layout_type")
   metadata      Json?
   createdAt     DateTime            @default(now()) @map("created_at")
   updatedAt     DateTime            @updatedAt @map("updated_at")

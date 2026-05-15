@@ -10,7 +10,9 @@ import {
 } from "@/lib/ai/prompts/follow-up"
 import {
   buildProposalSystemPrompt,
+  buildProposalRefinementSystemPrompt,
   buildProposalSectionPrompt,
+  buildProposalRefinementPrompt,
 } from "@/lib/ai/prompts/proposal"
 import { resolvePlaceholders, formatProposalDate } from "@/lib/ai/placeholder"
 import type { ActionResult } from "@/types"
@@ -221,7 +223,7 @@ export async function generateProposal(
     return { success: false, error: "Failed to create proposal record" }
   }
 
-  // ── 4. Resolve / generate each section ───────────────────────────────────
+  // ── 4. Resolve / generate each section (three modes) ─────────────────────
   type SectionPayload = {
     proposalId: string
     type: ProposalSectionType
@@ -230,34 +232,65 @@ export async function generateProposal(
     order: number
     isAIGenerated: boolean
     isVisible: boolean
+    visualStyle: string
+    layoutType: string
   }
+
+  const leadCtx = {
+    name: lead.name,
+    company: lead.companyName,
+    industry: lead.industry,
+    serviceInterested: lead.serviceInterested,
+    currentProblem: lead.currentProblem,
+    currentTools: lead.currentTools,
+    teamSize: lead.teamSize,
+  }
+
+  const refinementSystemPrompt = buildProposalRefinementSystemPrompt()
 
   const sectionPromises = template.sections.map(async (templateSection) => {
     let content: string
 
-    if (!templateSection.isAIGenerated) {
-      // Resolve placeholders synchronously — no AI
-      content = resolvePlaceholders(templateSection.contentTemplate, placeholderCtx)
+    if (!templateSection.isAIGenerated && !templateSection.isAIRefinement) {
+      // Mode C — placeholder resolution only, no AI
+      content = resolvePlaceholders(templateSection.templateText, placeholderCtx)
+    } else if (templateSection.isAIRefinement) {
+      // Mode B — AI refines templateText using lead context
+      try {
+        const userPrompt = buildProposalRefinementPrompt(
+          templateSection.templateText,
+          leadCtx,
+          noteStrings,
+          activityStrings,
+          templateSection.aiInstructions ?? undefined
+        )
+        const completion = await openai.chat.completions.create({
+          model: AI_MODEL,
+          messages: [
+            { role: "system", content: refinementSystemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.6,
+          max_tokens: 600,
+        })
+        content =
+          completion.choices[0]?.message?.content?.trim() ??
+          templateSection.templateText
+      } catch {
+        content = templateSection.templateText // fallback: use original draft
+      }
     } else {
-      // Generate this section with AI
+      // Mode A — AI writes section from scratch
       try {
         const userPrompt = buildProposalSectionPrompt(
           templateSection.type,
-          {
-            name: lead.name,
-            company: lead.companyName,
-            industry: lead.industry,
-            serviceInterested: lead.serviceInterested,
-            currentProblem: lead.currentProblem,
-            currentTools: lead.currentTools,
-            teamSize: lead.teamSize,
-          },
+          leadCtx,
           noteStrings,
           activityStrings,
           followUpTitles,
-          options.customInstructions
+          options.customInstructions,
+          templateSection.aiInstructions ?? undefined
         )
-
         const completion = await openai.chat.completions.create({
           model: AI_MODEL,
           messages: [
@@ -267,11 +300,10 @@ export async function generateProposal(
           temperature: 0.7,
           max_tokens: 600,
         })
-
-        content = completion.choices[0]?.message?.content?.trim() ??
+        content =
+          completion.choices[0]?.message?.content?.trim() ??
           "[Generation failed — click Edit to write this section manually.]"
       } catch {
-        // Section-level failure: graceful fallback — proposal still gets created
         content = "[Generation failed — click Edit to write this section manually.]"
       }
     }
@@ -282,8 +314,10 @@ export async function generateProposal(
       title: templateSection.title,
       content,
       order: templateSection.order,
-      isAIGenerated: templateSection.isAIGenerated,
+      isAIGenerated: templateSection.isAIGenerated || templateSection.isAIRefinement,
       isVisible: true,
+      visualStyle: templateSection.visualStyle,
+      layoutType: templateSection.layoutType,
     } satisfies SectionPayload
   })
 
