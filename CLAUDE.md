@@ -116,6 +116,9 @@ model ProposalTemplate         — id, name (unique), description, isDefault, ti
 model ProposalTemplateSection  — id, templateId, type, title, templateText, aiInstructions?, order, isRequired, isAIGenerated, isAIRefinement, visualStyle (VisualStyle), layoutType (LayoutType), metadata (Json?), timestamps.
 model Proposal                 — id, leadId, templateId?, title, status (ProposalStatus), validUntil?, totalValue?, createdBy?, sentAt?, timestamps. Cascade on lead delete.
 model ProposalSection          — id, proposalId, type, title, content, order, isAIGenerated, isVisible, visualStyle (VisualStyle), layoutType (LayoutType), metadata (Json?), timestamps. Cascade on proposal delete.
+model Invoice                  — id, invoiceNumber, leadId, proposalId?, type, status, issueDate, dueDate, client snapshot fields, totals, timestamps.
+model InvoiceItem              — id, invoiceId, description, quantity, unitPrice, total. Cascade on invoice delete.
+model Payment                  — id, invoiceId, amountReceived, paymentDate, paymentMode, transactionReference, utrNumber, notes. Cascade on invoice delete.
 ```
 
 Full schema at: `prisma/schema.prisma`
@@ -151,7 +154,10 @@ app/
       [id]/page.tsx             — template editor (sections, reorder, AI flags, placeholders)
       [id]/loading.tsx
     pipeline/page.tsx           — placeholder
-    invoices/page.tsx           — placeholder
+    invoices/
+      page.tsx                  — invoices list with status badges
+      new/page.tsx              — generate invoice form (manual or from proposal)
+      [id]/page.tsx             — invoice workspace + export PDF + log payment
     clients/page.tsx            — placeholder
     tasks/page.tsx              — placeholder
     settings/page.tsx           — placeholder
@@ -256,6 +262,7 @@ prisma/
 app/
   api/
     proposals/[id]/pdf/route.ts   — GET: renders proposal to PDF via react-pdf, returns application/pdf
+    invoices/[id]/pdf/route.ts    — GET: renders invoice to PDF via react-pdf, returns application/pdf
 ```
 
 ---
@@ -432,6 +439,15 @@ Route `GET /api/proposals/[id]/pdf` — fetches proposal + sections, renders via
 
 ---
 
+## Invoice System
+
+- **Receipt-style workflow**: Built for an agency workflow where invoices are primarily issued *after* payment as a receipt. 
+- **Generation**: Created via `/invoices/new`. The user can select a proposal to pre-fill line items, or manually add items. The generation form allows immediate logging of payment (amount, mode, reference) to instantly mark it `PAID` or `PARTIALLY_PAID`.
+- **Snapshots**: Client details (name, company, email, address) are snapshotted on the `Invoice` record at creation so historical records do not drift if the Lead changes.
+- **PDF Export**: Generates clean, branded PDFs reusing the `react-pdf` architecture and token system from proposals.
+
+---
+
 ## Environment Variables
 
 `.env` — Prisma CLI reads this.
@@ -467,7 +483,7 @@ OPENAI_MODEL=gpt-4o-mini
 | Proposal Templates (CRUD, section management) | Complete |
 | AI Context Orchestration (transcript processing, context builders, prompt standards) | Complete |
 | Pipeline (Kanban) | Placeholder page only |
-| Invoices | Placeholder page only |
+| Invoices | Complete |
 | Clients | Placeholder page only |
 | Tasks (global view) | Placeholder page only |
 | Settings | Placeholder page only |

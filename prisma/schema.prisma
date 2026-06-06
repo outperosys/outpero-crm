@@ -418,6 +418,7 @@ model Payment {
   invoiceId            String   @map("invoice_id")
   amountReceived       Float    @map("amount_received")
   paymentDate          DateTime @map("payment_date")
+  paymentMode          String?  @map("payment_mode")
   transactionReference String?  @map("transaction_reference")
   utrNumber            String?  @map("utr_number")
   notes                String?
