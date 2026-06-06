@@ -85,6 +85,36 @@ enum ProposalStatus {
   DECLINED
 }
 
+enum TranscriptSource {
+  MANUAL
+  GOOGLE_MEET
+  ZOOM
+}
+
+enum InvoiceType {
+  ONE_TIME_PROJECT
+  MONTHLY_RETAINER
+  SETUP_FEE
+  CUSTOM
+}
+
+enum PaymentTerms {
+  DUE_ON_RECEIPT
+  DAYS_7
+  DAYS_14
+  DAYS_30
+  CUSTOM
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model Profile {
@@ -143,11 +173,13 @@ model Lead {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  noteEntries Note[]
-  activities  Activity[]
-  tasks       Task[]
-  followUps   FollowUp[]
-  proposals   Proposal[]
+  noteEntries        Note[]
+  activities         Activity[]
+  tasks              Task[]
+  followUps          FollowUp[]
+  proposals          Proposal[]
+  meetingTranscripts MeetingTranscript[]
+  invoices           Invoice[]
 
   @@map("leads")
 }
@@ -280,6 +312,7 @@ model Proposal {
   lead     Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
   template ProposalTemplate? @relation(fields: [templateId], references: [id])
   sections ProposalSection[]
+  invoices Invoice[]
 
   @@map("proposals")
 }
@@ -302,4 +335,96 @@ model ProposalSection {
   proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
 
   @@map("proposal_sections")
+}
+
+// ─── Meeting Transcripts ──────────────────────────────────────────────────────
+
+model MeetingTranscript {
+  id          String           @id @default(cuid())
+  leadId      String           @map("lead_id")
+  rawText     String?          @map("raw_text")
+  insights    Json
+  source      TranscriptSource @default(MANUAL)
+  processedAt DateTime         @default(now()) @map("processed_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("meeting_transcripts")
+}
+
+// ─── Invoice System ──────────────────────────────────────────────────────────
+
+model Invoice {
+  id             String        @id @default(cuid())
+  invoiceNumber  String        @unique @map("invoice_number")
+  leadId         String        @map("lead_id")
+  proposalId     String?       @map("proposal_id")
+  
+  type           InvoiceType
+  status         InvoiceStatus @default(DRAFT)
+  
+  issueDate      DateTime      @map("issue_date")
+  dueDate        DateTime      @map("due_date")
+  
+  // Client Info Snapshot
+  clientName     String        @map("client_name")
+  companyName    String?       @map("company_name")
+  email          String?
+  phone          String?
+  billingAddress String?       @map("billing_address")
+  
+  // GST Info
+  gstEnabled     Boolean       @default(false) @map("gst_enabled")
+  gstNumber      String?       @map("gst_number")
+  gstPercentage  Float?        @map("gst_percentage")
+  
+  // Notes
+  notes          String?
+  internalNotes  String?       @map("internal_notes")
+  
+  // Totals
+  subtotal       Float
+  gstAmount      Float         @default(0) @map("gst_amount")
+  grandTotal     Float         @map("grand_total")
+  paymentTerms   PaymentTerms  @default(DUE_ON_RECEIPT) @map("payment_terms")
+  
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  lead           Lead          @relation(fields: [leadId], references: [id])
+  proposal       Proposal?     @relation(fields: [proposalId], references: [id])
+  items          InvoiceItem[]
+  payments       Payment[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String   @map("invoice_id")
+  description String
+  quantity    Int
+  unitPrice   Float    @map("unit_price")
+  total       Float
+  
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id                   String   @id @default(cuid())
+  invoiceId            String   @map("invoice_id")
+  amountReceived       Float    @map("amount_received")
+  paymentDate          DateTime @map("payment_date")
+  transactionReference String?  @map("transaction_reference")
+  utrNumber            String?  @map("utr_number")
+  notes                String?
+  
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  invoice              Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
 }

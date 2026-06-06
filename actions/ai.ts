@@ -15,6 +15,7 @@ import {
   buildProposalRefinementPrompt,
 } from "@/lib/ai/prompts/proposal"
 import { resolvePlaceholders, formatProposalDate } from "@/lib/ai/placeholder"
+import { buildLeadContext, processTranscript } from "@/lib/ai/context"
 import type { ActionResult } from "@/types"
 import type { FollowUpGenerationOptions, FollowUpVariation } from "@/lib/ai/types"
 import type { ProposalSectionType } from "@prisma/client"
@@ -27,6 +28,8 @@ async function requireAuth() {
   if (!user) throw new Error("Unauthorized")
   return user
 }
+
+// ─── Follow-up generation ──────────────────────────────────────────────────────
 
 export async function generateFollowUpDrafts(
   leadId: string,
@@ -41,7 +44,6 @@ export async function generateFollowUpDrafts(
     }
   }
 
-  // Fetch lead context + recent activities in parallel
   const [lead, activities] = await Promise.all([
     prisma.lead.findUnique({
       where: { id: leadId },
@@ -68,9 +70,7 @@ export async function generateFollowUpDrafts(
     }),
   ])
 
-  if (!lead) {
-    return { success: false, error: "Lead not found" }
-  }
+  if (!lead) return { success: false, error: "Lead not found" }
 
   const systemPrompt = buildFollowUpSystemPrompt()
   const userPrompt = buildFollowUpUserPrompt(lead, activities, options)
@@ -88,9 +88,7 @@ export async function generateFollowUpDrafts(
     })
 
     const content = completion.choices[0]?.message?.content
-    if (!content) {
-      return { success: false, error: "No response received from AI" }
-    }
+    if (!content) return { success: false, error: "No response received from AI" }
 
     const parsed = JSON.parse(content) as { variations?: unknown }
     const variations = parsed.variations
@@ -110,22 +108,9 @@ export async function generateFollowUpDrafts(
 
 export interface ProposalGenerationOptions {
   customInstructions?: string
+  transcriptText?: string   // raw text from a discovery call or meeting
 }
 
-/**
- * Generates a full structured proposal from a lead + template.
- * Flow:
- *   1. Fetch all context in parallel (lead, notes, activities, follow-ups, template)
- *   2. Create Proposal record (DRAFT)
- *   3. For non-AI sections: resolve placeholders → content ready
- *   4. For AI sections: build prompt → call OpenAI (all in Promise.all)
- *   5. Persist all ProposalSection records
- *   6. Return proposal ID
- *
- * Failure strategy:
- *   - Per-section AI failure: stores a fallback message, proposal still created
- *   - Fatal failure (no lead/template, DB error): returns error, cleans up proposal
- */
 export async function generateProposal(
   leadId: string,
   templateId: string,
@@ -138,7 +123,7 @@ export async function generateProposal(
   }
 
   // ── 1. Fetch all context in parallel ──────────────────────────────────────
-  const [lead, notes, activities, followUps, template] = await Promise.all([
+  const [lead, notes, activities, followUps, template, existingTranscripts] = await Promise.all([
     prisma.lead.findUnique({
       where: { id: leadId },
       select: {
@@ -149,18 +134,23 @@ export async function generateProposal(
         currentProblem: true,
         currentTools: true,
         teamSize: true,
+        source: true,
+        urgency: true,
+        priority: true,
+        pipelineStage: true,
+        dealValue: true,
       },
     }),
     prisma.note.findMany({
       where: { leadId },
       orderBy: { createdAt: "desc" },
-      take: 5,
+      take: 10,
       select: { content: true },
     }),
     prisma.activity.findMany({
       where: { leadId },
       orderBy: { createdAt: "desc" },
-      take: 5,
+      take: 8,
       select: { type: true, description: true, createdAt: true },
     }),
     prisma.followUp.findMany({
@@ -173,14 +163,55 @@ export async function generateProposal(
       where: { id: templateId },
       include: { sections: { orderBy: { order: "asc" } } },
     }),
+    prisma.meetingTranscript.findMany({
+      where: { leadId },
+      orderBy: { processedAt: "desc" },
+      take: 2,
+      select: { insights: true },
+    }),
   ])
 
   if (!lead) return { success: false, error: "Lead not found" }
   if (!template) return { success: false, error: "Template not found" }
 
-  // ── 2. Build shared context objects ───────────────────────────────────────
-  const proposalDate = formatProposalDate()
+  // ── 2. Process new transcript if provided ─────────────────────────────────
+  let newTranscriptInsights = null
+  if (options.transcriptText?.trim()) {
+    try {
+      newTranscriptInsights = await processTranscript(options.transcriptText)
+      // Persist for future proposals on this lead
+      await prisma.meetingTranscript.create({
+        data: {
+          leadId,
+          rawText: options.transcriptText.slice(0, 8000),
+          insights: newTranscriptInsights as object,
+          source: "MANUAL",
+        },
+      })
+    } catch {
+      // Don't block proposal generation if transcript processing fails
+      newTranscriptInsights = null
+    }
+  }
 
+  // ── 3. Build centralized lead context ─────────────────────────────────────
+  // Merge newly processed transcript with any existing transcripts from DB
+  const allTranscriptInsights = [
+    ...(newTranscriptInsights ? [newTranscriptInsights] : []),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...existingTranscripts.map((t) => t.insights as any),
+  ]
+
+  const leadCtx = await buildLeadContext(
+    lead,
+    notes,
+    activities,
+    followUps,
+    allTranscriptInsights.length > 0 ? allTranscriptInsights : undefined
+  )
+
+  // ── 4. Build placeholder context (for static sections) ────────────────────
+  const proposalDate = formatProposalDate()
   const placeholderCtx = {
     lead: {
       name: lead.name,
@@ -192,38 +223,24 @@ export async function generateProposal(
       teamSize: lead.teamSize,
     },
     proposal: { date: proposalDate },
-    // agency context: will be injected from BusinessSettings when built
   }
 
-  const noteStrings = notes.map((n) => n.content)
-  const activityStrings = activities.map(
-    (a) => `[${a.type.replace("_", " ")}] ${a.description}`
-  )
-  const followUpTitles = followUps.map((f) => f.title)
-
-  const systemPrompt = buildProposalSystemPrompt(/* business */ undefined)
-
+  // ── 5. Create the Proposal record (DRAFT) ─────────────────────────────────
   const proposalTitle = lead.companyName
     ? `${lead.companyName} — ${template.name}`
     : `${lead.name} — ${template.name}`
 
-  // ── 3. Create the Proposal record (DRAFT) ─────────────────────────────────
   let proposal: { id: string }
   try {
     proposal = await prisma.proposal.create({
-      data: {
-        leadId,
-        templateId,
-        title: proposalTitle,
-        status: "DRAFT",
-      },
+      data: { leadId, templateId, title: proposalTitle, status: "DRAFT" },
       select: { id: true },
     })
   } catch {
     return { success: false, error: "Failed to create proposal record" }
   }
 
-  // ── 4. Resolve / generate each section (three modes) ─────────────────────
+  // ── 6. Resolve / generate each section (three modes) ─────────────────────
   type SectionPayload = {
     proposalId: string
     type: ProposalSectionType
@@ -236,69 +253,76 @@ export async function generateProposal(
     layoutType: string
   }
 
-  const leadCtx = {
-    name: lead.name,
-    company: lead.companyName,
-    industry: lead.industry,
-    serviceInterested: lead.serviceInterested,
-    currentProblem: lead.currentProblem,
-    currentTools: lead.currentTools,
-    teamSize: lead.teamSize,
-  }
-
+  const systemPrompt = buildProposalSystemPrompt()
   const refinementSystemPrompt = buildProposalRefinementSystemPrompt()
+
+  // Token budgets matched to expected output length per section type.
+  // Tighter limits force conciseness — the model fills structure, not space.
+  const SECTION_MAX_TOKENS: Partial<Record<string, number>> = {
+    COVER:             130,
+    EXECUTIVE_SUMMARY: 260,
+    PROBLEM_STATEMENT: 240,
+    PROPOSED_SOLUTION: 270,
+    SCOPE_OF_WORK:     320,
+    TIMELINE:          300,
+    NEXT_STEPS:        180,
+    ABOUT_US:          200,
+    TERMS:             220,
+    CUSTOM:            280,
+  }
+  const DEFAULT_MAX_TOKENS = 260
+  // Refinement prompts process more input so they get a small buffer
+  const REFINEMENT_BUFFER = 80
 
   const sectionPromises = template.sections.map(async (templateSection) => {
     let content: string
 
     if (!templateSection.isAIGenerated && !templateSection.isAIRefinement) {
-      // Mode C — placeholder resolution only, no AI
+      // Mode C — placeholder resolution only, no AI call
       content = resolvePlaceholders(templateSection.templateText, placeholderCtx)
     } else if (templateSection.isAIRefinement) {
-      // Mode B — AI refines templateText using lead context
+      // Mode B — AI refines templateText using full lead context
       try {
         const userPrompt = buildProposalRefinementPrompt(
           templateSection.templateText,
           leadCtx,
-          noteStrings,
-          activityStrings,
           templateSection.aiInstructions ?? undefined
         )
+        const sectionTokens =
+          (SECTION_MAX_TOKENS[templateSection.type] ?? DEFAULT_MAX_TOKENS) + REFINEMENT_BUFFER
         const completion = await openai.chat.completions.create({
           model: AI_MODEL,
           messages: [
             { role: "system", content: refinementSystemPrompt },
             { role: "user", content: userPrompt },
           ],
-          temperature: 0.6,
-          max_tokens: 600,
+          temperature: 0.55,
+          max_tokens: sectionTokens,
         })
         content =
           completion.choices[0]?.message?.content?.trim() ??
           templateSection.templateText
       } catch {
-        content = templateSection.templateText // fallback: use original draft
+        content = templateSection.templateText
       }
     } else {
-      // Mode A — AI writes section from scratch
+      // Mode A — AI writes section from scratch using full lead context
       try {
         const userPrompt = buildProposalSectionPrompt(
           templateSection.type,
           leadCtx,
-          noteStrings,
-          activityStrings,
-          followUpTitles,
           options.customInstructions,
           templateSection.aiInstructions ?? undefined
         )
+        const sectionTokens = SECTION_MAX_TOKENS[templateSection.type] ?? DEFAULT_MAX_TOKENS
         const completion = await openai.chat.completions.create({
           model: AI_MODEL,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          temperature: 0.7,
-          max_tokens: 600,
+          temperature: 0.65,
+          max_tokens: sectionTokens,
         })
         content =
           completion.choices[0]?.message?.content?.trim() ??
@@ -321,17 +345,15 @@ export async function generateProposal(
     } satisfies SectionPayload
   })
 
-  // All AI sections run in parallel — non-AI sections resolve immediately
   let sections: SectionPayload[]
   try {
     sections = await Promise.all(sectionPromises)
   } catch {
-    // Fatal parallel failure — clean up the proposal record
     await prisma.proposal.delete({ where: { id: proposal.id } }).catch(() => null)
     return { success: false, error: "Proposal generation failed. Please try again." }
   }
 
-  // ── 5. Persist all sections ────────────────────────────────────────────────
+  // ── 7. Persist all sections ────────────────────────────────────────────────
   try {
     await prisma.proposalSection.createMany({ data: sections })
   } catch {

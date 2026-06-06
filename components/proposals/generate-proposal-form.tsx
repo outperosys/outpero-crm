@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Sparkles, Loader2 } from "lucide-react"
+import { Sparkles, Loader2, ChevronDown, ChevronUp, FileText } from "lucide-react"
 
 interface GenerateProposalFormProps {
   leads: Pick<Lead, "id" | "name" | "companyName">[]
@@ -24,17 +24,18 @@ interface GenerateProposalFormProps {
 }
 
 export function GenerateProposalForm({ leads, templates, defaultLeadId }: GenerateProposalFormProps) {
-  // Compute defaultTemplate first so we can initialize templateId state with it
   const defaultTemplate = templates.find((t) => t.isDefault)
 
   const [leadId, setLeadId] = useState(defaultLeadId ?? "")
   const [templateId, setTemplateId] = useState(defaultTemplate?.id ?? "")
   const [customInstructions, setCustomInstructions] = useState("")
+  const [transcriptText, setTranscriptText] = useState("")
+  const [transcriptOpen, setTranscriptOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!leadId || !templateId) return
     setError(null)
@@ -42,6 +43,7 @@ export function GenerateProposalForm({ leads, templates, defaultLeadId }: Genera
     startTransition(async () => {
       const result = await generateProposal(leadId, templateId, {
         customInstructions: customInstructions.trim() || undefined,
+        transcriptText: transcriptText.trim() || undefined,
       })
       if (!result.success) {
         setError(result.error)
@@ -53,6 +55,7 @@ export function GenerateProposalForm({ leads, templates, defaultLeadId }: Genera
 
   const selectedTemplate = templates.find((t) => t.id === templateId) ?? defaultTemplate
   const aiSectionCount = selectedTemplate?.sections.filter((s) => s.isAIGenerated).length ?? 0
+  const hasTranscript = transcriptText.trim().length > 0
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -100,6 +103,49 @@ export function GenerateProposalForm({ leads, templates, defaultLeadId }: Genera
         )}
       </div>
 
+      {/* Meeting transcript (collapsible) */}
+      <div className="space-y-2">
+        <button
+          type="button"
+          className="flex items-center gap-2 text-sm font-medium w-full text-left group"
+          onClick={() => setTranscriptOpen((o) => !o)}
+          disabled={isPending}
+        >
+          <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+          <span>
+            Meeting transcript
+            {hasTranscript && (
+              <span className="ml-2 text-xs text-green-600 dark:text-green-400 font-normal">
+                · added
+              </span>
+            )}
+          </span>
+          <span className="text-muted-foreground font-normal text-xs ml-1">(optional)</span>
+          {transcriptOpen ? (
+            <ChevronUp className="h-3.5 w-3.5 ml-auto text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5 ml-auto text-muted-foreground" />
+          )}
+        </button>
+
+        {transcriptOpen && (
+          <div className="space-y-2">
+            <Textarea
+              id="transcript-text"
+              placeholder="Paste a discovery call transcript, meeting notes, or Google Meet transcript here…"
+              value={transcriptText}
+              onChange={(e) => setTranscriptText(e.target.value)}
+              rows={8}
+              disabled={isPending}
+              className="resize-none text-sm font-mono"
+            />
+            <p className="text-xs text-muted-foreground">
+              The AI will extract pain points, goals, objections, and context from the transcript before generating your proposal. Raw text is processed and not stored verbatim.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Custom instructions */}
       <div className="space-y-2">
         <Label htmlFor="custom-instructions">
@@ -138,7 +184,7 @@ export function GenerateProposalForm({ leads, templates, defaultLeadId }: Genera
           {isPending ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generating proposal…
+              {hasTranscript ? "Processing transcript & generating…" : "Generating proposal…"}
             </>
           ) : (
             <>
@@ -149,7 +195,9 @@ export function GenerateProposalForm({ leads, templates, defaultLeadId }: Genera
         </Button>
         {isPending && (
           <p className="text-xs text-center text-muted-foreground mt-2">
-            AI is writing your sections — this takes 5–15 seconds
+            {hasTranscript
+              ? "Extracting call insights then writing sections — this takes 15–25 seconds"
+              : "AI is writing your sections — this takes 5–15 seconds"}
           </p>
         )}
       </div>
