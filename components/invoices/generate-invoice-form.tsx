@@ -3,7 +3,7 @@
 import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { generateInvoiceFormSchema, type GenerateInvoiceFormInputValues } from "@/lib/validations/invoice"
-import { InvoiceType, PaymentTerms } from "@prisma/client"
+import { InvoiceType, PaymentTerms, type Service } from "@prisma/client"
 import {
   Form,
   FormControl,
@@ -31,6 +31,12 @@ interface GenerateInvoiceFormProps {
   onSubmit: (data: GenerateInvoiceFormInputValues) => Promise<void>
   onCancel: () => void
   isPending?: boolean
+  services?: Service[]
+  isEditing?: boolean
+  defaultLeadId?: string
+  defaultProposalId?: string
+  defaultBankDetails?: string
+  defaultTerms?: string
 }
 
 export function GenerateInvoiceForm({
@@ -38,13 +44,23 @@ export function GenerateInvoiceForm({
   onSubmit,
   onCancel,
   isPending,
+  services = [],
+  isEditing = false,
+  defaultLeadId,
+  defaultProposalId,
+  defaultBankDetails,
+  defaultTerms,
 }: GenerateInvoiceFormProps) {
   const form = useForm<GenerateInvoiceFormInputValues>({
     resolver: zodResolver(generateInvoiceFormSchema),
     defaultValues: {
+      documentType: "INVOICE",
       type: "ONE_TIME_PROJECT",
       paymentTerms: "DUE_ON_RECEIPT",
       gstEnabled: false,
+      gstPercentage: 0,
+      bankDetails: defaultBankDetails || "",
+      terms: defaultTerms || "",
       gstNumber: "",
       notes: "",
       items: defaultValues.items?.length ? defaultValues.items : [{ description: "", quantity: 1, unitPrice: 0, total: 0 }],
@@ -57,6 +73,9 @@ export function GenerateInvoiceForm({
       ...defaultValues,
     },
   })
+
+  const docType = form.watch("documentType")
+  const isReceipt = docType === "RECEIPT"
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -71,11 +90,33 @@ export function GenerateInvoiceForm({
         
         {/* SETUP */}
         <section className="space-y-4">
-          <p className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
-            1. Invoice Setup
-          </p>
+          <h3 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+            1. Configuration
+          </h3>
 
           <div className="grid gap-4 sm:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="documentType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Document Type</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="INVOICE">Invoice</SelectItem>
+                      <SelectItem value="RECEIPT">Receipt</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="type"
@@ -214,10 +255,40 @@ export function GenerateInvoiceForm({
                   <FormField
                     control={form.control}
                     name={`items.${index}.description`}
-                    render={({ field }) => (
+                    render={({ field: descField }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="Item Description" {...field} />
+                          <div className="flex gap-2">
+                            <Input 
+                              placeholder="Item Description" 
+                              {...descField} 
+                            />
+                            {services.length > 0 && (
+                              <Select 
+                                onValueChange={(val) => {
+                                  descField.onChange(val)
+                                  const svc = services.find(s => s.name === val)
+                                  if (svc) {
+                                    const price = svc.defaultPrice || svc.startingPrice || 0
+                                    form.setValue(`items.${index}.unitPrice`, price)
+                                    const qty = form.getValues(`items.${index}.quantity`) || 1
+                                    form.setValue(`items.${index}.total`, price * qty)
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-[180px] shrink-0">
+                                  <SelectValue placeholder="Catalog" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {services.map(s => (
+                                    <SelectItem key={s.id} value={s.name}>
+                                      {s.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -289,95 +360,97 @@ export function GenerateInvoiceForm({
         </section>
 
         {/* PAYMENT DETAILS */}
-        <section className="space-y-4 border-t pt-6">
-          <div className="space-y-1">
-            <p className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
-              3. Initial Payment (Optional)
-            </p>
-            <p className="text-sm text-muted-foreground">
-              If the client has already paid, record the details here so the invoice acts as a receipt.
-            </p>
-          </div>
+        {!isEditing && (
+          <section className="space-y-4 border-t pt-6">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+                3. Initial Payment (Optional)
+              </p>
+              <p className="text-sm text-muted-foreground">
+                If the client has already paid, record the details here so the invoice acts as a receipt.
+              </p>
+            </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 border rounded-md p-4 bg-muted/10">
-            <FormField
-              control={form.control}
-              name="paymentDetails.amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Amount Received</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01"
-                      placeholder="0.00" 
-                      value={field.value ?? ""}
-                      onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="paymentDetails.mode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Mode</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+            <div className="grid gap-4 sm:grid-cols-2 border rounded-md p-4 bg-muted/10">
+              <FormField
+                control={form.control}
+                name="paymentDetails.amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount Received</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="e.g. Bank Transfer, UPI..." />
-                      </SelectTrigger>
+                      <Input 
+                        type="number" 
+                        step="0.01"
+                        placeholder="0.00" 
+                        value={field.value ?? ""}
+                        onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                      />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                      <SelectItem value="UPI">UPI</SelectItem>
-                      <SelectItem value="Credit Card">Credit Card</SelectItem>
-                      <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="paymentDetails.transactionReference"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Transaction ID / Ref</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. TXN12345" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="paymentDetails.mode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Mode</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="e.g. Bank Transfer, UPI..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                        <SelectItem value="UPI">UPI</SelectItem>
+                        <SelectItem value="Credit Card">Credit Card</SelectItem>
+                        <SelectItem value="Cash">Cash</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="paymentDetails.paymentDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Date</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="date"
-                      value={field.value ? field.value.toISOString().split('T')[0] : ""}
-                      onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </section>
+              <FormField
+                control={form.control}
+                name="paymentDetails.transactionReference"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Transaction ID / Ref</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. TXN12345" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="paymentDetails.paymentDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Date</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        value={field.value ? field.value.toISOString().split('T')[0] : ""}
+                        onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </section>
+        )}
 
         {/* NOTES */}
         <section className="space-y-4 border-t pt-6">
@@ -399,6 +472,52 @@ export function GenerateInvoiceForm({
               </FormItem>
             )}
           />
+
+          {!isReceipt && (
+            <FormField
+              control={form.control}
+              name="bankDetails"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Info / Bank Details</FormLabel>
+                  <FormDescription>
+                    This will appear at the bottom of the invoice. You can edit this per-invoice if needed.
+                  </FormDescription>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Bank: Tech Bank&#10;Account: 1234567890&#10;Routing: 098765432" 
+                      className="resize-none"
+                      rows={4}
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          <FormField
+            control={form.control}
+            name="terms"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Terms & Conditions</FormLabel>
+                <FormDescription>
+                  Standard terms added to the bottom of the document.
+                </FormDescription>
+                <FormControl>
+                  <Textarea 
+                    placeholder="1. Payment is due within 14 days." 
+                    className="resize-none"
+                    rows={4}
+                    {...field} 
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </section>
 
         <div className="flex justify-end gap-2 border-t pt-4">
@@ -406,7 +525,7 @@ export function GenerateInvoiceForm({
             Cancel
           </Button>
           <Button type="submit" disabled={isPending}>
-            {isPending ? "Creating Invoice..." : "Generate Invoice"}
+            {isPending ? (isEditing ? "Saving..." : "Creating Invoice...") : (isEditing ? "Save Changes" : "Generate Invoice")}
           </Button>
         </div>
       </form>

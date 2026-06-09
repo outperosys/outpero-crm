@@ -20,6 +20,7 @@ interface CompleteFollowUpDialogProps {
   followUpId: string
   title: string
   assignedTo?: string | null
+  teamMembers?: { id: string; name: string }[]
 }
 
 export function CompleteFollowUpDialog({
@@ -28,12 +29,13 @@ export function CompleteFollowUpDialog({
   followUpId,
   title,
   assignedTo,
+  teamMembers = [],
 }: CompleteFollowUpDialogProps) {
   const [isPending, startTransition] = useTransition()
   const nextTitleRef = useRef<HTMLInputElement>(null)
   const nextDateRef = useRef<HTMLInputElement>(null)
   const nextNotesRef = useRef<HTMLTextAreaElement>(null)
-  const nextAssignedRef = useRef<HTMLInputElement>(null)
+  const nextAssignedRef = useRef<HTMLInputElement | HTMLSelectElement>(null)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -84,22 +86,36 @@ export function CompleteFollowUpDialog({
 
             <div className="grid grid-cols-2 gap-2.5">
               <div className="space-y-1.5">
-                <Label className="text-xs">Due Date</Label>
+                <Label className="text-xs">Due Date &amp; Time</Label>
                 <Input
                   ref={nextDateRef}
-                  type="date"
+                  type="datetime-local"
                   disabled={isPending}
                   className="text-sm"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Assign To</Label>
-                <Input
-                  ref={nextAssignedRef}
-                  placeholder={assignedTo ?? "Name…"}
-                  disabled={isPending}
-                  className="text-sm"
-                />
+                {teamMembers.length > 0 ? (
+                  <select
+                    ref={nextAssignedRef as React.RefObject<HTMLSelectElement>}
+                    disabled={isPending}
+                    defaultValue={assignedTo ?? ""}
+                    className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    <option value="">Unassigned</option>
+                    {teamMembers.map((m) => (
+                      <option key={m.id} value={m.name}>{m.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    ref={nextAssignedRef as React.RefObject<HTMLInputElement>}
+                    placeholder={assignedTo ?? "Name…"}
+                    disabled={isPending}
+                    className="text-sm"
+                  />
+                )}
               </div>
             </div>
 

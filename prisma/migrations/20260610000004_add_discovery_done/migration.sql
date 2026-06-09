@@ -1,0 +1,2 @@
+-- Add DISCOVERY_DONE to PipelineStage enum
+ALTER TYPE "PipelineStage" ADD VALUE IF NOT EXISTS 'DISCOVERY_DONE';

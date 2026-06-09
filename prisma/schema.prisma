@@ -19,6 +19,7 @@ enum PipelineStage {
   NEW_LEAD
   QUALIFIED
   DISCOVERY_CALL
+  DISCOVERY_DONE
   PROPOSAL_SENT
   FOLLOW_UP
   WON
@@ -43,6 +44,8 @@ enum ActivityType {
   EMAIL
   PROPOSAL_SENT
   FOLLOW_UP
+  INVOICE
+  PAYMENT
   STATUS_CHANGE
   NOTE
 }
@@ -92,10 +95,10 @@ enum TranscriptSource {
 }
 
 enum InvoiceType {
-  ONE_TIME_PROJECT
-  MONTHLY_RETAINER
-  SETUP_FEE
-  CUSTOM
+  FULL_PAYMENT
+  ADVANCE_PAYMENT
+  MILESTONE_PAYMENT
+  FINAL_PAYMENT
 }
 
 enum PaymentTerms {
@@ -113,6 +116,40 @@ enum InvoiceStatus {
   PAID
   OVERDUE
   CANCELLED
+}
+
+enum ServiceStatus {
+  ACTIVE
+  DRAFT
+  ARCHIVED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  WAITING
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskRelatedType {
+  LEAD
+  INVOICE
+  RECEIPT
+  SERVICE
+  GENERAL
+}
+
+enum TaskSource {
+  MANUAL
+  AI_SUGGESTED
+  RECURRING
 }
 
 // ─── Models ───────────────────────────────────────────────────────────────────
@@ -141,6 +178,7 @@ model Lead {
   // Lead context
   source            String?
   serviceInterested String? @map("service_interested")
+  callVolume        String? @map("call_volume")
   industry          String?
   teamSize          String? @map("team_size")
 
@@ -180,6 +218,7 @@ model Lead {
   proposals          Proposal[]
   meetingTranscripts MeetingTranscript[]
   invoices           Invoice[]
+  receipts           Receipt[]
 
   @@map("leads")
 }
@@ -202,6 +241,7 @@ model Activity {
   leadId      String       @map("lead_id")
   type        ActivityType
   description String
+  link        String?
   createdBy   String?      @map("created_by")
   createdAt   DateTime     @default(now()) @map("created_at")
 
@@ -211,19 +251,53 @@ model Activity {
 }
 
 model Task {
-  id          String    @id @default(cuid())
-  leadId      String    @map("lead_id")
+  id          String       @id @default(cuid())
   title       String
-  dueDate     DateTime? @map("due_date")
-  completed   Boolean   @default(false)
-  completedAt DateTime? @map("completed_at")
-  assignedTo  String?   @map("assigned_to")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  description String?
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  dueDate     DateTime?    @map("due_date")
+  assignedTo  String?      @map("assigned_to")
+  createdBy   String?      @map("created_by")
+  completedAt DateTime?    @map("completed_at")
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  relatedType TaskRelatedType @default(GENERAL) @map("related_type")
+  leadId      String?         @map("lead_id")
+  invoiceId   String?         @map("invoice_id")
+  receiptId   String?         @map("receipt_id")
+  serviceId   String?         @map("service_id")
 
+  source   TaskSource @default(MANUAL)
+  metadata Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  lead    Lead?    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  receipt Receipt? @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  comments TaskComment[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([assignedTo])
+  @@index([dueDate])
+  @@index([relatedType])
   @@map("tasks")
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String   @map("task_id")
+  content   String
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_comments")
 }
 
 model FollowUp {
@@ -353,6 +427,124 @@ model MeetingTranscript {
   @@map("meeting_transcripts")
 }
 
+// ─── Service Catalog ──────────────────────────────────────────────────────────
+
+model Service {
+  id String @id @default(cuid())
+
+  // Core Info
+  name             String
+  category         String
+  status           ServiceStatus @default(ACTIVE)
+  shortDescription String        @map("short_description")
+  fullDescription  String?       @map("full_description")
+
+  // Pricing
+  startingPrice Float? @map("starting_price")
+  defaultPrice  Float? @map("default_price")
+  pricingNotes  String? @map("pricing_notes")
+
+  // Delivery
+  timeline            String?
+  deliverables        String?
+  implementationSteps String? @map("implementation_steps")
+
+  // Sales
+  idealClient      String? @map("ideal_client")
+  problemsSolved   String? @map("problems_solved")
+  commonObjections String? @map("common_objections")
+
+  // AI
+  aiContext            String? @map("ai_context")
+  proposalInstructions String? @map("proposal_instructions")
+  followUpInstructions String? @map("follow_up_instructions")
+
+  // Templates
+  proposalDefaults String? @map("proposal_defaults")
+  invoiceDefaults  String? @map("invoice_defaults")
+
+  // Internal
+  notes String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tasks Task[]
+
+  @@unique([name])
+  @@index([status])
+  @@index([category])
+  @@map("services")
+}
+
+// ─── Settings System ──────────────────────────────────────────────────────────
+
+model AgencySettings {
+  id String @id @default("1")
+
+  // Business
+  businessName String? @map("business_name")
+  website      String?
+  email        String?
+  phone        String?
+  address      String?
+  gstNumber    String? @map("gst_number")
+  tagline      String?
+
+  // Branding
+  logoUrl          String? @map("logo_url")
+  primaryColor     String? @map("primary_color")
+  secondaryColor   String? @map("secondary_color")
+  accentColor      String? @map("accent_color")
+  brandDescription String? @map("brand_description")
+
+  // Payments
+  bankName            String? @map("bank_name")
+  accountHolder       String? @map("account_holder")
+  accountNumber       String? @map("account_number")
+  ifscCode            String? @map("ifsc_code")
+  upiId               String? @map("upi_id")
+  paymentInstructions String? @map("payment_instructions")
+
+  // AI
+  defaultTone          String? @map("default_tone")
+  defaultProposalStyle String? @map("default_proposal_style")
+  defaultFollowUpStyle String? @map("default_follow_up_style")
+  aiBrandVoice         String? @map("ai_brand_voice")
+
+  // Service Preferences
+  defaultServiceId   String? @map("default_service_id")
+  featuredServiceIds Json?   @map("featured_service_ids")
+  serviceOrdering    String? @map("service_ordering")
+
+  // Pipeline
+  pipelineStageLabels Json?   @map("pipeline_stage_labels")
+  defaultWonStage     String? @default("WON") @map("default_won_stage")
+  defaultLostStage    String? @default("LOST") @map("default_lost_stage")
+
+  // Legacy (preserved)
+  name        String?
+  bankDetails String? @map("bank_details")
+  terms       String?
+  toneOfVoice String? @map("tone_of_voice")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("agency_settings")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  name      String
+  role      String
+  email     String   @unique
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("team_members")
+}
+
 // ─── Invoice System ──────────────────────────────────────────────────────────
 
 model Invoice {
@@ -379,14 +571,17 @@ model Invoice {
   gstNumber      String?       @map("gst_number")
   gstPercentage  Float?        @map("gst_percentage")
   
-  // Notes
+  // Notes & Info
+  bankDetails    String?       @map("bank_details")
+  terms          String?
   notes          String?
   internalNotes  String?       @map("internal_notes")
   
   // Totals
-  subtotal       Float
-  gstAmount      Float         @default(0) @map("gst_amount")
-  grandTotal     Float         @map("grand_total")
+  subtotal        Float
+  discountAmount  Float         @default(0) @map("discount_amount")
+  gstAmount       Float         @default(0) @map("gst_amount")
+  grandTotal      Float         @map("grand_total")
   paymentTerms   PaymentTerms  @default(DUE_ON_RECEIPT) @map("payment_terms")
   
   createdAt      DateTime      @default(now()) @map("created_at")
@@ -395,7 +590,8 @@ model Invoice {
   lead           Lead          @relation(fields: [leadId], references: [id])
   proposal       Proposal?     @relation(fields: [proposalId], references: [id])
   items          InvoiceItem[]
-  payments       Payment[]
+  receipts       Receipt[]
+  tasks          Task[]
 
   @@map("invoices")
 }
@@ -413,19 +609,36 @@ model InvoiceItem {
   @@map("invoice_items")
 }
 
-model Payment {
+// ─── Receipt System ──────────────────────────────────────────────────────────
+
+model Receipt {
   id                   String   @id @default(cuid())
-  invoiceId            String   @map("invoice_id")
+  receiptNumber        String   @unique @map("receipt_number")
+  receiptDate          DateTime @map("receipt_date")
+  
+  invoiceId            String?  @map("invoice_id")
+  leadId               String   @map("lead_id")
+  
+  // Snapshot
+  clientName           String   @map("client_name")
+  companyName          String?  @map("company_name")
+  
   amountReceived       Float    @map("amount_received")
   paymentDate          DateTime @map("payment_date")
-  paymentMode          String?  @map("payment_mode")
+  paymentMethod        String?  @map("payment_method")
   transactionReference String?  @map("transaction_reference")
   utrNumber            String?  @map("utr_number")
   notes                String?
+  terms                String?
   
+  services             String   // Comma separated list of services paid for
+  
+  invoice              Invoice? @relation(fields: [invoiceId], references: [id])
+  lead                 Lead     @relation(fields: [leadId], references: [id])
+  tasks                Task[]
+
   createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
-  invoice              Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-
-  @@map("payments")
+  @@map("receipts")
 }

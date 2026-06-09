@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import "@/lib/pdf/fonts"
+import { AgencyLogo } from "./logo"
 import React from "react"
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
+import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer"
 import {
   COLORS, FONTS, SPACING, TYPE,
   PDF_VISUAL_STYLES, type PdfVisualStyleKey,
@@ -11,6 +13,8 @@ export interface PdfBusinessContext {
   agencyName?: string
   contactEmail?: string
   website?: string
+  logoUrl?: string
+  primaryColor?: string
 }
 
 // ─── StyleSheet (fixed, non-dynamic styles) ───────────────────────────────────
@@ -43,7 +47,7 @@ const s = StyleSheet.create({
   coverTitle: { fontSize: TYPE.coverTitle, color: COLORS.body, lineHeight: 1.4 },
   coverDivider: { width: 32, height: 2, backgroundColor: COLORS.black, marginTop: 20, marginBottom: 20 },
   coverMeta: { fontSize: 9.5, color: COLORS.muted, marginBottom: 5 },
-  coverNote: { fontSize: 9, color: COLORS.muted, marginTop: 18, lineHeight: 1.6, fontFamily: FONTS.oblique },
+  coverNote: { fontSize: 9, color: COLORS.muted, marginTop: 18, lineHeight: 1.6, fontFamily: FONTS.regular },
   coverBottom: { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 14 },
   coverBottomText: { fontSize: TYPE.footer, color: COLORS.faint, letterSpacing: 0.3 },
 
@@ -114,20 +118,51 @@ function parseTimeline(content: string) {
   })
 }
 
+// ─── Logo block ───────────────────────────────────────────────────────────────
+
+function LogoBlock({
+  logoUrl,
+  agencyName,
+  size,
+  color,
+}: {
+  logoUrl?: string
+  agencyName: string
+  size?: number
+  color?: string
+}) {
+  if (logoUrl) {
+    return (
+      <Image
+        src={logoUrl}
+        style={{ height: (size ?? 14) * 2, maxWidth: 120, objectFit: "contain" }}
+      />
+    )
+  }
+  return <AgencyLogo name={agencyName} size={size} color={color} />
+}
+
 // ─── Style-aware section wrapper ──────────────────────────────────────────────
 
 function Section({
   title,
   visualStyle,
+  primaryColor,
   children,
 }: {
   title: string
   visualStyle: PdfVisualStyleKey
+  primaryColor?: string
   children: React.ReactNode
 }) {
   const t = PDF_VISUAL_STYLES[visualStyle] ?? PDF_VISUAL_STYLES.CLEAN
+  // For HIGHLIGHT, override the left border color with brand color if provided
+  const containerOverride =
+    primaryColor && visualStyle === "HIGHLIGHT"
+      ? { borderLeftColor: primaryColor }
+      : {}
   return (
-    <View style={[s.sectionBlock, t.container as any]}>
+    <View style={[s.sectionBlock, t.container as any, containerOverride]}>
       <View style={s.headingRow}>
         <Text style={t.headingText as any}>{title}</Text>
         {t.showHeadingLine && <View style={s.headingLine} />}
@@ -216,17 +251,19 @@ function SectionRenderer({
   title,
   content,
   visualStyle,
+  primaryColor,
 }: {
   type: string
   title: string
   content: string
   visualStyle: PdfVisualStyleKey
+  primaryColor?: string
 }) {
   if (!content.trim() || type === "COVER") return null
   const t = PDF_VISUAL_STYLES[visualStyle] ?? PDF_VISUAL_STYLES.CLEAN
 
   return (
-    <Section title={title} visualStyle={visualStyle}>
+    <Section title={title} visualStyle={visualStyle} primaryColor={primaryColor}>
       {type === "PRICING" ? (
         <PricingTable content={content} />
       ) : type === "TIMELINE" ? (
@@ -256,11 +293,14 @@ function CoverPage({
   })
   const coverNote = proposal.sections.find((s) => s.type === "COVER")?.content?.trim()
 
+  const primaryColor = business?.primaryColor
+  const logoUrl = business?.logoUrl
+
   return (
     <Page size="A4" style={s.coverPage}>
       {/* Agency identifier */}
       <View style={s.coverLogoRow}>
-        <Text style={s.coverAgency}>{agencyName.toUpperCase()}</Text>
+        <LogoBlock logoUrl={logoUrl} agencyName={agencyName} size={9} color={COLORS.muted} />
       </View>
 
       {/* Document identity */}
@@ -268,7 +308,7 @@ function CoverPage({
         <Text style={s.coverEyebrow}>Prepared for</Text>
         <Text style={s.coverCompany}>{companyName}</Text>
         <Text style={s.coverTitle}>{proposal.title}</Text>
-        <View style={s.coverDivider} />
+        <View style={[s.coverDivider, primaryColor ? { backgroundColor: primaryColor } : {}]} />
         <Text style={s.coverMeta}>By {agencyName}</Text>
         <Text style={s.coverMeta}>{date}</Text>
         {coverNote ? <Text style={s.coverNote}>{coverNote}</Text> : null}
@@ -319,6 +359,7 @@ export function ProposalPdfDocument({
               title={section.title}
               content={section.content}
               visualStyle={((section as any).visualStyle ?? "CLEAN") as PdfVisualStyleKey}
+              primaryColor={business?.primaryColor}
             />
           ))}
 

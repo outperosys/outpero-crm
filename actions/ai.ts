@@ -17,8 +17,24 @@ import {
 import { resolvePlaceholders, formatProposalDate } from "@/lib/ai/placeholder"
 import { buildLeadContext, processTranscript } from "@/lib/ai/context"
 import type { ActionResult } from "@/types"
-import type { FollowUpGenerationOptions, FollowUpVariation } from "@/lib/ai/types"
-import type { ProposalSectionType } from "@prisma/client"
+import type { FollowUpGenerationOptions, FollowUpVariation, BusinessContext } from "@/lib/ai/types"
+import type { Prisma, ProposalSectionType } from "@prisma/client"
+
+async function getBusinessContext(): Promise<BusinessContext | undefined> {
+  try {
+    const db = prisma as any // eslint-disable-line @typescript-eslint/no-explicit-any
+    const s = await db.agencySettings.findUnique({ where: { id: "1" } })
+    if (!s) return undefined
+    return {
+      agencyName:          s.businessName         ?? undefined,
+      brandTone:           s.defaultTone          ?? s.toneOfVoice ?? undefined,
+      proposalStyle:       s.defaultProposalStyle ?? undefined,
+      customInstructions:  s.aiBrandVoice         ?? undefined,
+    }
+  } catch {
+    return undefined
+  }
+}
 
 async function requireAuth() {
   const supabase = await createClient()
@@ -72,7 +88,8 @@ export async function generateFollowUpDrafts(
 
   if (!lead) return { success: false, error: "Lead not found" }
 
-  const systemPrompt = buildFollowUpSystemPrompt()
+  const business = await getBusinessContext()
+  const systemPrompt = buildFollowUpSystemPrompt(business)
   const userPrompt = buildFollowUpUserPrompt(lead, activities, options)
 
   try {
@@ -226,6 +243,8 @@ export async function generateProposal(
   }
 
   // ── 5. Create the Proposal record (DRAFT) ─────────────────────────────────
+  const business = await getBusinessContext()
+
   const proposalTitle = lead.companyName
     ? `${lead.companyName} — ${template.name}`
     : `${lead.name} — ${template.name}`
@@ -241,20 +260,10 @@ export async function generateProposal(
   }
 
   // ── 6. Resolve / generate each section (three modes) ─────────────────────
-  type SectionPayload = {
-    proposalId: string
-    type: ProposalSectionType
-    title: string
-    content: string
-    order: number
-    isAIGenerated: boolean
-    isVisible: boolean
-    visualStyle: string
-    layoutType: string
-  }
+  type SectionPayload = Prisma.ProposalSectionCreateManyInput
 
-  const systemPrompt = buildProposalSystemPrompt()
-  const refinementSystemPrompt = buildProposalRefinementSystemPrompt()
+  const systemPrompt = buildProposalSystemPrompt(business)
+  const refinementSystemPrompt = buildProposalRefinementSystemPrompt(business)
 
   // Token budgets matched to expected output length per section type.
   // Tighter limits force conciseness — the model fills structure, not space.
@@ -360,6 +369,15 @@ export async function generateProposal(
     await prisma.proposal.delete({ where: { id: proposal.id } }).catch(() => null)
     return { success: false, error: "Failed to save proposal sections. Please try again." }
   }
+
+  await prisma.activity.create({
+    data: {
+      leadId,
+      type: "PROPOSAL_SENT",
+      description: `Proposal generated: ${proposalTitle}`,
+      link: `/proposals/${proposal.id}`,
+    },
+  }).catch(() => null)
 
   revalidatePath("/proposals")
   revalidatePath(`/leads/${leadId}`)

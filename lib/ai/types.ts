@@ -51,5 +51,6 @@ export interface BusinessContext {
   agencyName?: string
   services?: string[]
   brandTone?: string
+  proposalStyle?: string
   customInstructions?: string
 }

@@ -1,13 +1,14 @@
 import { z } from "zod"
 
 export const PIPELINE_STAGES = [
-  { value: "NEW_LEAD", label: "New Lead" },
-  { value: "QUALIFIED", label: "Qualified" },
-  { value: "DISCOVERY_CALL", label: "Discovery Call" },
-  { value: "PROPOSAL_SENT", label: "Proposal Sent" },
-  { value: "FOLLOW_UP", label: "Follow-up" },
-  { value: "WON", label: "Won" },
-  { value: "LOST", label: "Lost" },
+  { value: "NEW_LEAD",          label: "New Lead" },
+  { value: "QUALIFIED",         label: "Contacted" },
+  { value: "DISCOVERY_CALL",    label: "Discovery Scheduled" },
+  { value: "DISCOVERY_DONE",    label: "Discovery Done" },
+  { value: "PROPOSAL_SENT",     label: "Proposal Sent" },
+  { value: "FOLLOW_UP",         label: "Negotiation" },
+  { value: "WON",               label: "Won" },
+  { value: "LOST",              label: "Lost" },
 ] as const
 
 export const PRIORITIES = [
@@ -22,20 +23,42 @@ export const URGENCIES = [
   { value: "HIGH", label: "High" },
 ] as const
 
+export const LEAD_SOURCES = [
+  "Instagram",
+  "LinkedIn",
+  "Facebook",
+  "WhatsApp",
+  "Referral",
+  "Cold Call",
+  "Email Outreach",
+  "Google Ads",
+  "YouTube",
+  "Website / SEO",
+  "Twitter / X",
+  "IndiaMART",
+  "JustDial",
+  "Event / Conference",
+  "Partner",
+  "Other",
+] as const
+
 export const INDUSTRIES = [
   "E-commerce",
   "Real Estate",
   "Healthcare",
   "Education",
-  "Finance",
+  "Finance & BFSI",
   "Retail",
   "Technology",
   "Food & Beverage",
+  "Hospitality",
   "Legal",
+  "Logistics",
+  "Manufacturing",
   "Other",
 ] as const
 
-export const TEAM_SIZES = ["1-5", "6-20", "21-50", "51-200", "201-500", "500+"] as const
+export const TEAM_SIZES = ["1–5", "6–20", "21–50", "51–200", "201–500", "500+"] as const
 
 export const leadSchema = z.object({
   name: z.string().min(1, "Lead name is required"),
@@ -49,6 +72,7 @@ export const leadSchema = z.object({
 
   source: z.string().optional(),
   serviceInterested: z.string().optional(),
+  callVolume: z.string().optional(),
   industry: z.string().optional(),
   teamSize: z.string().optional(),
 
@@ -64,6 +88,7 @@ export const leadSchema = z.object({
     "NEW_LEAD",
     "QUALIFIED",
     "DISCOVERY_CALL",
+    "DISCOVERY_DONE",
     "PROPOSAL_SENT",
     "FOLLOW_UP",
     "WON",

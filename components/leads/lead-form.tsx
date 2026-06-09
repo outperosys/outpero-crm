@@ -8,6 +8,7 @@ import {
   PIPELINE_STAGES,
   PRIORITIES,
   URGENCIES,
+  LEAD_SOURCES,
   INDUSTRIES,
   TEAM_SIZES,
 } from "@/lib/validations/lead"
@@ -33,6 +34,8 @@ import { Button } from "@/components/ui/button"
 
 interface LeadFormProps {
   defaultValues?: Partial<LeadFormValues>
+  services?: { id: string; name: string }[]
+  teamMembers?: { id: string; name: string }[]
   onSubmit: (data: LeadFormValues) => Promise<void>
   onCancel: () => void
   isPending?: boolean
@@ -40,6 +43,8 @@ interface LeadFormProps {
 
 export function LeadForm({
   defaultValues,
+  services = [],
+  teamMembers = [],
   onSubmit,
   onCancel,
   isPending,
@@ -53,6 +58,7 @@ export function LeadForm({
       email: "",
       source: "",
       serviceInterested: "",
+      callVolume: "",
       industry: "",
       teamSize: "",
       socialProfiles: "",
@@ -90,7 +96,7 @@ export function LeadForm({
                     Name <span className="text-destructive">*</span>
                   </FormLabel>
                   <FormControl>
-                    <Input placeholder="Jane Smith" {...field} />
+                    <Input placeholder="Rajesh Kumar" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -103,7 +109,7 @@ export function LeadForm({
                 <FormItem>
                   <FormLabel>Company</FormLabel>
                   <FormControl>
-                    <Input placeholder="Acme Inc." {...field} />
+                    <Input placeholder="Acme Pvt. Ltd." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -116,7 +122,7 @@ export function LeadForm({
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="jane@acme.com" {...field} />
+                    <Input type="email" placeholder="rajesh@acme.in" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -129,7 +135,7 @@ export function LeadForm({
                 <FormItem>
                   <FormLabel>Phone</FormLabel>
                   <FormControl>
-                    <Input placeholder="+1 234 567 890" {...field} />
+                    <Input placeholder="+91 98765 43210" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -144,32 +150,85 @@ export function LeadForm({
             Lead Context
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
+            {/* Call volume — spans full width */}
+            <div className="sm:col-span-2">
+              <FormField
+                control={form.control}
+                name="callVolume"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Calls per Day / Month</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. 500/day, 10,000/month" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <FormField
               control={form.control}
               name="source"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Source</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Instagram, Referral…" {...field} />
-                  </FormControl>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || undefined}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select source" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {LEAD_SOURCES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
               name="serviceInterested"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Service Interested</FormLabel>
-                  <FormControl>
-                    <Input placeholder="AI Chatbot, Automation…" {...field} />
-                  </FormControl>
+                  {services.length > 0 ? (
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || undefined}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select service" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {services.map((s) => (
+                          <SelectItem key={s.id} value={s.name}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <FormControl>
+                      <Input placeholder="AI Chatbot, Automation…" {...field} />
+                    </FormControl>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
               name="industry"
@@ -434,7 +493,7 @@ export function LeadForm({
               name="dealValue"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Deal Value ($)</FormLabel>
+                  <FormLabel>Deal Value (₹)</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -485,7 +544,20 @@ export function LeadForm({
                 <FormItem>
                   <FormLabel>Assigned To</FormLabel>
                   <FormControl>
-                    <Input placeholder="Team member name…" {...field} />
+                    {teamMembers.length > 0 ? (
+                      <Select value={field.value || ""} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select team member…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {teamMembers.map((m) => (
+                            <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input placeholder="Team member name…" {...field} />
+                    )}
                   </FormControl>
                   <FormMessage />
                 </FormItem>

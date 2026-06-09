@@ -1,6 +1,7 @@
 import { CalendarClock } from "lucide-react"
 import { getFollowUps, getTemplates } from "@/actions/follow-ups"
 import { getLeads } from "@/actions/leads"
+import { getTeamMembers } from "@/actions/settings"
 import { FollowUpCard } from "@/components/follow-ups/follow-up-card"
 import { CreateFollowUpDialog } from "@/components/follow-ups/create-follow-up-dialog"
 import type { FollowUpWithLead } from "@/actions/follow-ups"
@@ -30,10 +31,11 @@ function partitionFollowUps(followUps: FollowUpWithLead[]) {
 }
 
 export default async function FollowUpsPage() {
-  const [followUps, leads, templates] = await Promise.all([
+  const [followUps, leads, templates, teamMembers] = await Promise.all([
     getFollowUps(),
     getLeads(),
     getTemplates(),
+    getTeamMembers().catch(() => []),
   ])
 
   const { overdue, dueToday, upcoming, completed } = partitionFollowUps(followUps)
@@ -57,7 +59,7 @@ export default async function FollowUpsPage() {
               : `${totalPending} pending${overdue.length > 0 ? ` · ${overdue.length} overdue` : ""}`}
           </p>
         </div>
-        <CreateFollowUpDialog leads={leadOptions} templates={templates} />
+        <CreateFollowUpDialog leads={leadOptions} templates={templates} teamMembers={teamMembers} />
       </div>
 
       {/* Empty state */}
@@ -82,7 +84,7 @@ export default async function FollowUpsPage() {
           </div>
           <div className="space-y-2">
             {overdue.map((f) => (
-              <FollowUpCard key={f.id} followUp={f} variant="overdue" />
+              <FollowUpCard key={f.id} followUp={f} variant="overdue" teamMembers={teamMembers} />
             ))}
           </div>
         </section>
@@ -101,7 +103,7 @@ export default async function FollowUpsPage() {
           </div>
           <div className="space-y-2">
             {dueToday.map((f) => (
-              <FollowUpCard key={f.id} followUp={f} variant="today" />
+              <FollowUpCard key={f.id} followUp={f} variant="today" teamMembers={teamMembers} />
             ))}
           </div>
         </section>
@@ -113,7 +115,7 @@ export default async function FollowUpsPage() {
           <h2 className="text-sm font-medium text-muted-foreground">Upcoming</h2>
           <div className="space-y-2">
             {upcoming.map((f) => (
-              <FollowUpCard key={f.id} followUp={f} variant="upcoming" />
+              <FollowUpCard key={f.id} followUp={f} variant="upcoming" teamMembers={teamMembers} />
             ))}
           </div>
         </section>
@@ -127,7 +129,7 @@ export default async function FollowUpsPage() {
           </h2>
           <div className="space-y-2">
             {completed.map((f) => (
-              <FollowUpCard key={f.id} followUp={f} variant="completed" />
+              <FollowUpCard key={f.id} followUp={f} variant="completed" teamMembers={teamMembers} />
             ))}
           </div>
         </section>

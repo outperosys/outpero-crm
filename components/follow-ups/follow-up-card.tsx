@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { deleteFollowUp } from "@/actions/follow-ups"
 import { CompleteFollowUpDialog } from "./complete-follow-up-dialog"
 import { AIGeneratorSheet } from "./ai-generator-sheet"
-import { cn, formatDate } from "@/lib/utils"
+import { cn, formatDate, formatTime } from "@/lib/utils"
 import type { FollowUpWithLead } from "@/actions/follow-ups"
 
 const STAGE_LABELS: Record<string, string> = {
@@ -29,26 +29,31 @@ const PRIORITY_COLORS: Record<string, string> = {
 export type CardVariant = "overdue" | "today" | "upcoming" | "completed"
 
 function getDueDateLabel(dueDate: Date, variant: CardVariant): string {
-  if (variant === "completed") return `Completed ${formatDate(dueDate)}`
+  const time = formatTime(dueDate)
+  const at = time ? ` · ${time}` : ""
+
+  if (variant === "completed") return `Completed ${formatDate(dueDate)}${at}`
 
   const today = new Date()
   const todayMs = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
   const dueMs = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate()).getTime()
   const diffDays = Math.round((dueMs - todayMs) / 86400000)
 
-  if (diffDays < 0) return `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? "" : "s"} overdue`
-  if (diffDays === 0) return "Due today"
-  if (diffDays === 1) return "Due tomorrow"
-  if (diffDays <= 7) return `Due in ${diffDays} days`
-  return `Due ${formatDate(dueDate)}`
+  if (diffDays < 0) return `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? "" : "s"} overdue${at}`
+  if (diffDays === 0) return `Due today${at}`
+  if (diffDays === 1) return `Due tomorrow${at}`
+  if (diffDays <= 7) return `Due in ${diffDays} days${at}`
+  return `Due ${formatDate(dueDate)}${at}`
 }
 
 export function FollowUpCard({
   followUp,
   variant,
+  teamMembers = [],
 }: {
   followUp: FollowUpWithLead
   variant: CardVariant
+  teamMembers?: { id: string; name: string }[]
 }) {
   const [completeOpen, setCompleteOpen] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
@@ -188,6 +193,7 @@ export function FollowUpCard({
           followUpId={followUp.id}
           title={followUp.title}
           assignedTo={followUp.assignedTo}
+          teamMembers={teamMembers}
         />
       )}
 

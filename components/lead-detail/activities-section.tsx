@@ -28,7 +28,7 @@ export function ActivitiesSection({ activities, leadId }: ActivitiesSectionProps
           No activity logged yet
         </p>
       ) : (
-        <div className="space-y-4">
+        <div className="max-h-[420px] overflow-y-auto space-y-4 pr-1">
           {activities.map((activity) => (
             <ActivityItem key={activity.id} activity={activity} />
           ))}

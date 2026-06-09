@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { CompleteFollowUpDialog } from "@/components/follow-ups/complete-follow-up-dialog"
 import { AIGeneratorSheet } from "@/components/follow-ups/ai-generator-sheet"
 import { deleteFollowUp } from "@/actions/follow-ups"
-import { cn, formatDate } from "@/lib/utils"
+import { cn, formatDate, formatTime } from "@/lib/utils"
 import type { FollowUp } from "@prisma/client"
 
 function getDiffDays(dueDate: Date): number {
@@ -19,9 +19,11 @@ function getDiffDays(dueDate: Date): number {
 export function LeadFollowUpItem({
   followUp,
   leadName,
+  teamMembers = [],
 }: {
   followUp: FollowUp
   leadName: string
+  teamMembers?: { id: string; name: string }[]
 }) {
   const [completeOpen, setCompleteOpen] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
@@ -38,17 +40,20 @@ export function LeadFollowUpItem({
   }
 
   function dueDateLabel(): string {
+    const time = formatTime(followUp.dueDate)
+    const at = time ? ` · ${time}` : ""
+
     if (followUp.completed) {
       return followUp.completedAt
         ? `Completed ${formatDate(followUp.completedAt)}`
         : "Completed"
     }
-    if (diffDays === null) return formatDate(followUp.dueDate)
+    if (diffDays === null) return `${formatDate(followUp.dueDate)}${at}`
     if (diffDays < 0)
-      return `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? "" : "s"} overdue`
-    if (diffDays === 0) return "Due today"
-    if (diffDays === 1) return "Due tomorrow"
-    return formatDate(followUp.dueDate)
+      return `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? "" : "s"} overdue${at}`
+    if (diffDays === 0) return `Due today${at}`
+    if (diffDays === 1) return `Due tomorrow${at}`
+    return `${formatDate(followUp.dueDate)}${at}`
   }
 
   return (
@@ -140,6 +145,7 @@ export function LeadFollowUpItem({
             followUpId={followUp.id}
             title={followUp.title}
             assignedTo={followUp.assignedTo}
+            teamMembers={teamMembers}
           />
           <AIGeneratorSheet
             open={aiOpen}

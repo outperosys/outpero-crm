@@ -52,6 +52,7 @@ export function LeadOverviewCard({ lead }: { lead: Lead }) {
         <Section title="Lead Context">
           <Field label="Source" value={lead.source} />
           <Field label="Service Interested" value={lead.serviceInterested} />
+          <Field label="Calls per Day / Month" value={(lead as any).callVolume} />
           <Field label="Industry" value={lead.industry} />
           <Field label="Team Size" value={lead.teamSize} />
         </Section>

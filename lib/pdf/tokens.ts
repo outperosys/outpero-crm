@@ -16,9 +16,9 @@ export const COLORS = {
 }
 
 export const FONTS = {
-  regular: "Helvetica",
-  bold:    "Helvetica-Bold",
-  oblique: "Helvetica-Oblique",
+  regular: "Montserrat",
+  bold:    "Montserrat-Bold",
+  medium:  "Montserrat-Medium",
 }
 
 export const SPACING = {

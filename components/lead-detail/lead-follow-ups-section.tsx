@@ -8,6 +8,7 @@ interface LeadFollowUpsSectionProps {
   leadId: string
   leadName: string
   templates: FollowUpTemplate[]
+  teamMembers?: { id: string; name: string }[]
 }
 
 export function LeadFollowUpsSection({
@@ -15,6 +16,7 @@ export function LeadFollowUpsSection({
   leadId,
   leadName,
   templates,
+  teamMembers = [],
 }: LeadFollowUpsSectionProps) {
   const pending = followUps.filter((f) => !f.completed)
   const completed = followUps.filter((f) => f.completed)
@@ -31,6 +33,7 @@ export function LeadFollowUpsSection({
           <CreateFollowUpDialog
             templates={templates}
             leadId={leadId}
+            teamMembers={teamMembers}
             trigger={
               <button className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                 + Add
@@ -47,7 +50,7 @@ export function LeadFollowUpsSection({
       ) : (
         <div className="space-y-2">
           {pending.map((f) => (
-            <LeadFollowUpItem key={f.id} followUp={f} leadName={leadName} />
+            <LeadFollowUpItem key={f.id} followUp={f} leadName={leadName} teamMembers={teamMembers} />
           ))}
 
           {completed.length > 0 && pending.length > 0 && (
@@ -55,7 +58,7 @@ export function LeadFollowUpsSection({
           )}
 
           {completed.map((f) => (
-            <LeadFollowUpItem key={f.id} followUp={f} leadName={leadName} />
+            <LeadFollowUpItem key={f.id} followUp={f} leadName={leadName} teamMembers={teamMembers} />
           ))}
         </div>
       )}

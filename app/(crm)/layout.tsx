@@ -6,9 +6,9 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="overflow-hidden">
         <Topbar />
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6 flex flex-col">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   )

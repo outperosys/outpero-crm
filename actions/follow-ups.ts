@@ -72,6 +72,14 @@ export async function createFollowUp(
     },
   })
 
+  await prisma.activity.create({
+    data: {
+      leadId,
+      type: "FOLLOW_UP",
+      description: `Follow-up scheduled: ${title}${assignedTo ? ` → ${assignedTo}` : ""}`,
+    },
+  })
+
   await syncLeadNextFollowUp(leadId)
 
   revalidatePath("/follow-ups")

@@ -80,7 +80,7 @@ function EmptyState({ isFiltered }: { isFiltered: boolean }) {
       <p className="mt-1 text-sm text-muted-foreground mb-6">
         Add your first lead to start tracking your pipeline
       </p>
-      <CreateLeadDialog />
+      <CreateLeadDialog services={[]} />
     </div>
   )
 }
@@ -89,9 +89,11 @@ function EmptyState({ isFiltered }: { isFiltered: boolean }) {
 
 interface LeadsTableClientProps {
   leads: Lead[]
+  services?: { id: string; name: string }[]
+  teamMembers?: { id: string; name: string }[]
 }
 
-export function LeadsTableClient({ leads }: LeadsTableClientProps) {
+export function LeadsTableClient({ leads, services = [], teamMembers = [] }: LeadsTableClientProps) {
   const [search, setSearch] = useState("")
   const [stageFilter, setStageFilter] = useState("ALL")
   const [priorityFilter, setPriorityFilter] = useState("ALL")
@@ -164,7 +166,7 @@ export function LeadsTableClient({ leads }: LeadsTableClientProps) {
           </Select>
         </div>
 
-        <CreateLeadDialog />
+        <CreateLeadDialog services={services} teamMembers={teamMembers} />
       </div>
 
       {/* Table */}
@@ -278,7 +280,7 @@ export function LeadsTableClient({ leads }: LeadsTableClientProps) {
       )}
 
       {/* Single dialog instances driven by state */}
-      <EditLeadDialog lead={editingLead} onClose={() => setEditingLead(null)} />
+      <EditLeadDialog lead={editingLead} services={services} teamMembers={teamMembers} onClose={() => setEditingLead(null)} />
       <DeleteLeadDialog
         lead={deletingLead}
         onClose={() => setDeletingLead(null)}

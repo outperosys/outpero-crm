@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server"
 import { prisma } from "@/lib/prisma"
 import { ProposalPdfDocument } from "@/lib/pdf/proposal-document"
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = prisma as any
+
 function slugify(str: string): string {
   return str
     .toLowerCase()
@@ -54,6 +57,9 @@ export async function GET(
     return new NextResponse("Proposal has no sections to export", { status: 422 })
   }
 
+  // ── Fetch agency settings ─────────────────────────────────────────────────
+  const s = await db.agencySettings.findUnique({ where: { id: "1" } }).catch(() => null)
+
   // ── Render PDF ────────────────────────────────────────────────────────────
   let buffer: Buffer
   try {
@@ -61,7 +67,13 @@ export async function GET(
     buffer = await renderToBuffer(
       React.createElement(ProposalPdfDocument, {
         proposal: proposal as Parameters<typeof ProposalPdfDocument>[0]["proposal"],
-        business: { agencyName: "Outpero" },
+        business: {
+          agencyName:   s?.businessName  || "Outpero",
+          contactEmail: s?.email         || undefined,
+          website:      s?.website       || undefined,
+          logoUrl:      s?.logoUrl       || undefined,
+          primaryColor: s?.primaryColor  || undefined,
+        },
       }) as any
     )
   } catch (err) {

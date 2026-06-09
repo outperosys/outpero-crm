@@ -14,10 +14,12 @@ import type { LeadFormValues } from "@/lib/validations/lead"
 
 interface EditLeadDialogProps {
   lead: Lead | null
+  services?: { id: string; name: string }[]
+  teamMembers?: { id: string; name: string }[]
   onClose: () => void
 }
 
-export function EditLeadDialog({ lead, onClose }: EditLeadDialogProps) {
+export function EditLeadDialog({ lead, services = [], teamMembers = [], onClose }: EditLeadDialogProps) {
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -45,6 +47,7 @@ export function EditLeadDialog({ lead, onClose }: EditLeadDialogProps) {
         email: lead.email ?? "",
         source: lead.source ?? "",
         serviceInterested: lead.serviceInterested ?? "",
+        callVolume: (lead as any).callVolume ?? "",
         industry: lead.industry ?? "",
         teamSize: lead.teamSize ?? "",
         socialProfiles: lead.socialProfiles ?? "",
@@ -81,6 +84,8 @@ export function EditLeadDialog({ lead, onClose }: EditLeadDialogProps) {
         {lead && (
           <LeadForm
             key={lead.id}
+            services={services}
+            teamMembers={teamMembers}
             defaultValues={defaultValues}
             onSubmit={handleSubmit}
             onCancel={onClose}

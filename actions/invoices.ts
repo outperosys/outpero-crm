@@ -3,16 +3,15 @@
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { createClient } from "@/lib/supabase/server"
-import { generateInvoiceSchema, logPaymentSchema, type GenerateInvoiceFormValues, type LogPaymentFormValues } from "@/lib/validations/invoice"
+import { generateInvoiceSchema } from "@/lib/validations/financial"
 import type { ActionResult } from "@/types"
-import { InvoiceStatus, type Invoice, type Payment } from "@prisma/client"
+import { InvoiceStatus, ActivityType } from "@prisma/client"
 import { calculateDueDate, calculateInvoiceTotals } from "@/lib/invoice/utils"
+import { z } from "zod"
 
 async function requireAuth() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized")
   return user
 }
@@ -21,7 +20,7 @@ export async function getInvoices() {
   await requireAuth()
   return prisma.invoice.findMany({
     orderBy: { createdAt: "desc" },
-    include: { lead: true, proposal: true, items: true, payments: true }
+    include: { lead: true, proposal: true, items: true },
   })
 }
 
@@ -29,12 +28,12 @@ export async function getInvoice(id: string) {
   await requireAuth()
   return prisma.invoice.findUnique({
     where: { id },
-    include: { lead: true, proposal: true, items: true, payments: true }
+    include: { lead: true, proposal: true, items: true },
   })
 }
 
 export async function createInvoice(
-  data: GenerateInvoiceFormValues
+  data: z.infer<typeof generateInvoiceSchema>
 ): Promise<ActionResult<{ id: string }>> {
   await requireAuth()
 
@@ -43,29 +42,36 @@ export async function createInvoice(
     return { success: false, error: parsed.error.errors[0].message }
   }
 
-  const { items, gstEnabled, gstPercentage, paymentDetails, ...rest } = parsed.data
+  const { items, gstEnabled, gstPercentage, discountAmount, ...rest } = parsed.data
+
+  // Compute per-item totals server-side
+  const itemsWithTotals = items.map(item => ({
+    ...item,
+    total: item.quantity * item.unitPrice,
+  }))
+
   const issueDate = new Date()
   const dueDate = calculateDueDate(issueDate, rest.paymentTerms)
-  const totals = calculateInvoiceTotals(items, gstEnabled, gstPercentage)
+  const totals = calculateInvoiceTotals(itemsWithTotals, gstEnabled, gstPercentage, discountAmount)
 
   try {
     const newInvoice = await prisma.$transaction(async (tx) => {
+      // Snapshot client info from lead
+      const lead = await tx.lead.findUnique({ where: { id: rest.leadId } })
+      if (!lead) throw new Error("Lead not found")
+
       // Generate INV-XXXX
       const latestInvoice = await tx.invoice.findFirst({
-        orderBy: { invoiceNumber: 'desc' }
+        orderBy: { invoiceNumber: "desc" },
       })
-      
-      let nextNumber = 1
-      if (latestInvoice && latestInvoice.invoiceNumber.startsWith('INV-')) {
-        const numPart = latestInvoice.invoiceNumber.replace('INV-', '')
-        const parsedNum = parseInt(numPart, 10)
-        if (!isNaN(parsedNum)) {
-          nextNumber = parsedNum + 1
-        }
-      }
-      const invoiceNumber = `INV-${nextNumber.toString().padStart(4, '0')}`
 
-      // Create the invoice
+      let nextNumber = 1
+      if (latestInvoice?.invoiceNumber.startsWith("INV-")) {
+        const parsed = parseInt(latestInvoice.invoiceNumber.replace("INV-", ""), 10)
+        if (!isNaN(parsed)) nextNumber = parsed + 1
+      }
+      const invoiceNumber = `INV-${nextNumber.toString().padStart(4, "0")}`
+
       const invoice = await tx.invoice.create({
         data: {
           invoiceNumber,
@@ -73,51 +79,37 @@ export async function createInvoice(
           dueDate,
           gstEnabled,
           gstPercentage,
+          clientName: lead.name,
+          companyName: lead.companyName ?? null,
+          email: lead.email ?? null,
+          phone: lead.phone ?? null,
           ...rest,
           ...totals,
           status: InvoiceStatus.DRAFT,
           items: {
-            create: items.map(item => ({
+            create: itemsWithTotals.map(item => ({
               description: item.description,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
-              total: item.total
-            }))
-          }
-        }
+              total: item.total,
+            })),
+          },
+        },
       })
 
-      // If initial payment details are provided
-      let finalStatus = InvoiceStatus.DRAFT
-      if (paymentDetails && paymentDetails.amount && paymentDetails.amount > 0) {
-        await tx.payment.create({
-          data: {
-            invoiceId: invoice.id,
-            amountReceived: paymentDetails.amount,
-            paymentMode: paymentDetails.mode,
-            transactionReference: paymentDetails.transactionReference,
-            paymentDate: paymentDetails.paymentDate || new Date(),
-          }
-        })
-
-        if (paymentDetails.amount >= totals.grandTotal) {
-          finalStatus = InvoiceStatus.PAID
-        } else {
-          finalStatus = InvoiceStatus.PARTIALLY_PAID
-        }
-      }
-
-      if (finalStatus !== InvoiceStatus.DRAFT) {
-        await tx.invoice.update({
-          where: { id: invoice.id },
-          data: { status: finalStatus }
-        })
-      }
+      await tx.activity.create({
+        data: {
+          leadId: rest.leadId,
+          type: ActivityType.INVOICE,
+          description: `Invoice ${invoiceNumber} created — ₹${totals.grandTotal.toLocaleString("en-IN")}`,
+          link: `/financial/invoices/${invoice.id}`,
+        },
+      })
 
       return invoice
     })
 
-    revalidatePath("/invoices")
+    revalidatePath("/financial")
     return { success: true, data: { id: newInvoice.id } }
   } catch (error: any) {
     console.error("Failed to create invoice", error)
@@ -130,64 +122,72 @@ export async function updateInvoiceStatus(
   status: InvoiceStatus
 ): Promise<ActionResult> {
   await requireAuth()
-  
-  await prisma.invoice.update({
-    where: { id },
-    data: { status }
-  })
-  
-  revalidatePath("/invoices")
-  revalidatePath(`/invoices/${id}`)
+
+  await prisma.invoice.update({ where: { id }, data: { status } })
+
+  revalidatePath("/financial")
+  revalidatePath(`/financial/invoices/${id}`)
   return { success: true, data: undefined }
 }
 
-export async function logPayment(
-  data: LogPaymentFormValues
-): Promise<ActionResult<Payment>> {
+export async function updateInvoice(
+  id: string,
+  data: z.infer<typeof generateInvoiceSchema>
+): Promise<ActionResult<{ id: string }>> {
   await requireAuth()
 
-  const parsed = logPaymentSchema.safeParse(data)
+  const parsed = generateInvoiceSchema.safeParse(data)
   if (!parsed.success) {
     return { success: false, error: parsed.error.errors[0].message }
   }
 
+  const { items, gstEnabled, gstPercentage, discountAmount, ...rest } = parsed.data
+  const itemsWithTotals = items.map(item => ({
+    ...item,
+    total: item.quantity * item.unitPrice,
+  }))
+  const totals = calculateInvoiceTotals(itemsWithTotals, gstEnabled, gstPercentage, discountAmount)
+
   try {
-    const payment = await prisma.$transaction(async (tx) => {
-      const invoice = await tx.invoice.findUnique({
-        where: { id: parsed.data.invoiceId },
-        include: { payments: true }
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.invoice.findUnique({ where: { id } })
+      if (!existing) throw new Error("Invoice not found")
+
+      await tx.invoice.update({
+        where: { id },
+        data: { gstEnabled, gstPercentage, ...rest, ...totals },
       })
 
-      if (!invoice) throw new Error("Invoice not found")
-
-      const newPayment = await tx.payment.create({
-        data: parsed.data
+      await tx.invoiceItem.deleteMany({ where: { invoiceId: id } })
+      await tx.invoiceItem.createMany({
+        data: itemsWithTotals.map(item => ({
+          invoiceId: id,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.total,
+        })),
       })
-
-      const totalPaid = invoice.payments.reduce((sum, p) => sum + p.amountReceived, 0) + newPayment.amountReceived
-      
-      let newStatus = invoice.status
-      if (totalPaid >= invoice.grandTotal) {
-        newStatus = InvoiceStatus.PAID
-      } else if (totalPaid > 0) {
-        newStatus = InvoiceStatus.PARTIALLY_PAID
-      }
-
-      if (newStatus !== invoice.status) {
-        await tx.invoice.update({
-          where: { id: invoice.id },
-          data: { status: newStatus }
-        })
-      }
-
-      return newPayment
     })
 
-    revalidatePath("/invoices")
-    revalidatePath(`/invoices/${parsed.data.invoiceId}`)
-    return { success: true, data: payment }
+    revalidatePath("/financial")
+    revalidatePath(`/financial/invoices/${id}`)
+    return { success: true, data: { id } }
   } catch (error: any) {
-    console.error("Failed to log payment", error)
-    return { success: false, error: error.message || "Failed to log payment" }
+    console.error("Failed to update invoice", error)
+    return { success: false, error: "Failed to update invoice" }
+  }
+}
+
+export async function deleteInvoice(id: string): Promise<ActionResult> {
+  await requireAuth()
+
+  try {
+    await prisma.invoice.delete({ where: { id } })
+    revalidatePath("/financial")
+    return { success: true, data: undefined }
+  } catch (error: any) {
+    console.error("Failed to delete invoice", error)
+    return { success: false, error: "Failed to delete invoice" }
   }
 }

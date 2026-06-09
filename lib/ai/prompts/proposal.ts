@@ -120,10 +120,11 @@ export function buildProposalSystemPrompt(business?: BusinessContext): string {
     business?.services?.join(", ") ??
     "AI automation, workflow automation, and process optimization"
   const brandTone = business?.brandTone ?? "professional, direct, and results-focused"
+  const proposalStyle = business?.proposalStyle
 
   return `You are writing a professional business proposal on behalf of ${agencyName}, an AI automation agency specializing in ${services}.
 
-Tone: ${brandTone}
+Tone: ${brandTone}${proposalStyle ? `\nStyle: ${proposalStyle}` : ""}
 
 ${QUALITY_RULES}`
 }

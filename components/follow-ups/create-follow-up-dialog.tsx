@@ -22,6 +22,7 @@ interface CreateFollowUpDialogProps {
   templates: FollowUpTemplate[]
   leadId?: string
   trigger?: React.ReactNode
+  teamMembers?: { id: string; name: string }[]
 }
 
 export function CreateFollowUpDialog({
@@ -29,6 +30,7 @@ export function CreateFollowUpDialog({
   templates,
   leadId: defaultLeadId,
   trigger,
+  teamMembers = [],
 }: CreateFollowUpDialogProps) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -38,7 +40,7 @@ export function CreateFollowUpDialog({
   const titleRef = useRef<HTMLInputElement>(null)
   const notesRef = useRef<HTMLTextAreaElement>(null)
   const dueDateRef = useRef<HTMLInputElement>(null)
-  const assignedToRef = useRef<HTMLInputElement>(null)
+  const assignedToRef = useRef<HTMLInputElement | HTMLSelectElement>(null)
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
@@ -167,10 +169,10 @@ export function CreateFollowUpDialog({
           {/* Due date + assigned to */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Due Date</Label>
+              <Label className="text-xs">Due Date &amp; Time</Label>
               <Input
                 ref={dueDateRef}
-                type="date"
+                type="datetime-local"
                 required
                 disabled={isPending}
                 className="text-sm"
@@ -178,12 +180,25 @@ export function CreateFollowUpDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Assigned To</Label>
-              <Input
-                ref={assignedToRef}
-                placeholder="Name…"
-                disabled={isPending}
-                className="text-sm"
-              />
+              {teamMembers.length > 0 ? (
+                <select
+                  ref={assignedToRef as React.RefObject<HTMLSelectElement>}
+                  disabled={isPending}
+                  className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <option value="">Unassigned</option>
+                  {teamMembers.map((m) => (
+                    <option key={m.id} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <Input
+                  ref={assignedToRef as React.RefObject<HTMLInputElement>}
+                  placeholder="Name…"
+                  disabled={isPending}
+                  className="text-sm"
+                />
+              )}
             </div>
           </div>
 

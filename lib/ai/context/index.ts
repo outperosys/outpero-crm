@@ -1,4 +1,5 @@
 export { buildLeadContext } from "./lead"
+export { buildServiceContext, buildServicesContext } from "./service"
 export { processTranscript, formatTranscriptInsights, trimTranscript } from "./transcript"
 export { summarizeNotes } from "./summarize"
 export type { LeadFullContext, RawLead } from "./lead"

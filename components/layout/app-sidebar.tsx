@@ -9,6 +9,7 @@ import {
   CalendarClock,
   FileText,
   Receipt,
+  Wrench,
   Building2,
   CheckSquare,
   Layout,
@@ -30,8 +31,9 @@ const navMain = [
   { label: "Leads", href: "/leads", icon: Users },
   { label: "Pipeline", href: "/pipeline", icon: Kanban },
   { label: "Follow-ups", href: "/follow-ups", icon: CalendarClock },
+  { label: "Services", href: "/services", icon: Wrench },
   { label: "Proposals", href: "/proposals", icon: FileText },
-  { label: "Invoices", href: "/invoices", icon: Receipt },
+  { label: "Financial", href: "/financial", icon: Receipt },
   { label: "Clients", href: "/clients", icon: Building2 },
   { label: "Tasks", href: "/tasks", icon: CheckSquare },
   { label: "Templates", href: "/templates", icon: Layout },
@@ -56,7 +58,7 @@ export function AppSidebar() {
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname === item.href}
+                  isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
                   tooltip={item.label}
                 >
                   <Link href={item.href}>

@@ -14,7 +14,12 @@ import { LeadForm } from "./lead-form"
 import { createLead } from "@/actions/leads"
 import type { LeadFormValues } from "@/lib/validations/lead"
 
-export function CreateLeadDialog() {
+interface CreateLeadDialogProps {
+  services?: { id: string; name: string }[]
+  teamMembers?: { id: string; name: string }[]
+}
+
+export function CreateLeadDialog({ services = [], teamMembers = [] }: CreateLeadDialogProps) {
   const [open, setOpen] = useState(false)
   const [formKey, setFormKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -24,7 +29,7 @@ export function CreateLeadDialog() {
     setOpen(next)
     if (next) {
       setError(null)
-      setFormKey((k) => k + 1) // reset form on every open
+      setFormKey((k) => k + 1)
     }
   }
 
@@ -62,6 +67,8 @@ export function CreateLeadDialog() {
         )}
         <LeadForm
           key={formKey}
+          services={services}
+          teamMembers={teamMembers}
           onSubmit={handleSubmit}
           onCancel={() => setOpen(false)}
           isPending={isPending}

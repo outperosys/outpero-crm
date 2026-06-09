@@ -41,20 +41,24 @@ export function extractLineItemsFromProposalPricing(pricingContent: string) {
 export function calculateInvoiceTotals(
   items: { total: number }[],
   gstEnabled: boolean,
-  gstPercentage?: number
+  gstPercentage?: number | null,
+  discountAmount?: number | null
 ) {
   const subtotal = items.reduce((sum, item) => sum + item.total, 0)
+  const discount = discountAmount && discountAmount > 0 ? discountAmount : 0
+  const afterDiscount = Math.max(0, subtotal - discount)
   let gstAmount = 0
-  
+
   if (gstEnabled && gstPercentage && gstPercentage > 0) {
-    gstAmount = subtotal * (gstPercentage / 100)
+    gstAmount = afterDiscount * (gstPercentage / 100)
   }
-  
-  const grandTotal = subtotal + gstAmount
-  
+
+  const grandTotal = afterDiscount + gstAmount
+
   return {
     subtotal,
+    discountAmount: discount,
     gstAmount,
-    grandTotal
+    grandTotal,
   }
 }

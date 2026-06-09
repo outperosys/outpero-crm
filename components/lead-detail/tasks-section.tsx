@@ -1,30 +1,42 @@
-import { CheckSquare } from "lucide-react"
+import { CheckSquare, Plus } from "lucide-react"
 import type { Task } from "@prisma/client"
-import { AddTaskForm } from "./add-task-form"
-import { TaskItem } from "./task-item"
+import { Button } from "@/components/ui/button"
+import { TaskDialog } from "@/components/tasks/task-dialog"
+import { TaskItemCompact } from "@/components/tasks/task-item-compact"
 
 interface TasksSectionProps {
   tasks: Task[]
   leadId: string
+  teamMembers?: { id: string; name: string }[]
 }
 
-export function TasksSection({ tasks, leadId }: TasksSectionProps) {
-  const pending = tasks.filter((t) => !t.completed)
-  const completed = tasks.filter((t) => t.completed)
+export function TasksSection({ tasks, leadId, teamMembers = [] }: TasksSectionProps) {
+  const pending = tasks.filter((t) => t.status !== "DONE")
+  const completed = tasks.filter((t) => t.status === "DONE")
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <CheckSquare className="size-4 text-muted-foreground" />
         <h2 className="font-semibold">Tasks</h2>
-        {pending.length > 0 && (
-          <span className="ml-auto text-xs text-muted-foreground">
-            {pending.length} open
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {pending.length > 0 && (
+            <span className="text-xs text-muted-foreground">{pending.length} open</span>
+          )}
+          <TaskDialog
+            defaultRelatedType="LEAD"
+            defaultRelatedId={leadId}
+            lockRelated
+            teamMembers={teamMembers}
+            trigger={
+              <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs">
+                <Plus className="size-3.5" />
+                Add
+              </Button>
+            }
+          />
+        </div>
       </div>
-
-      <AddTaskForm leadId={leadId} />
 
       {tasks.length === 0 ? (
         <p className="py-4 text-center text-sm text-muted-foreground">
@@ -33,7 +45,7 @@ export function TasksSection({ tasks, leadId }: TasksSectionProps) {
       ) : (
         <div className="space-y-2">
           {pending.map((task) => (
-            <TaskItem key={task.id} task={task} />
+            <TaskItemCompact key={task.id} task={task} teamMembers={teamMembers} />
           ))}
 
           {completed.length > 0 && pending.length > 0 && (
@@ -41,7 +53,7 @@ export function TasksSection({ tasks, leadId }: TasksSectionProps) {
           )}
 
           {completed.map((task) => (
-            <TaskItem key={task.id} task={task} />
+            <TaskItemCompact key={task.id} task={task} teamMembers={teamMembers} />
           ))}
         </div>
       )}

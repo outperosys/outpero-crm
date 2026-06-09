@@ -1,8 +1,21 @@
+import { getTaskCounts } from "@/actions/tasks"
+
 export const metadata = {
   title: "Dashboard — Outpero CRM",
 }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const taskCounts = await getTaskCounts()
+
+  const stats = [
+    { label: "Active Leads", value: "—" },
+    { label: "Follow-ups Due", value: "—" },
+    { label: "Open Proposals", value: "—" },
+    { label: "Tasks Due Today", value: String(taskCounts.dueToday) },
+    { label: "Overdue Tasks", value: String(taskCounts.overdue) },
+    { label: "My Open Tasks", value: String(taskCounts.myOpen) },
+  ]
+
   return (
     <div className="space-y-6">
       <div>
@@ -13,12 +26,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "Active Leads", value: "—" },
-          { label: "Follow-ups Due", value: "—" },
-          { label: "Open Proposals", value: "—" },
-          { label: "Tasks Today", value: "—" },
-        ].map((stat) => (
+        {stats.map((stat) => (
           <div
             key={stat.label}
             className="rounded-lg border bg-card p-5 space-y-1"

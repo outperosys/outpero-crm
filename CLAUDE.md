@@ -103,6 +103,7 @@ enum LayoutType { FULL_WIDTH CENTERED TWO_COLUMN CARD }
 enum ProposalSectionType { COVER EXECUTIVE_SUMMARY PROBLEM_STATEMENT PROPOSED_SOLUTION SCOPE_OF_WORK TIMELINE PRICING ABOUT_US TERMS NEXT_STEPS CUSTOM }
 enum ProposalStatus { DRAFT REVIEW SENT ACCEPTED DECLINED }
 enum TranscriptSource { MANUAL GOOGLE_MEET ZOOM }
+enum ServiceStatus { ACTIVE DRAFT ARCHIVED }
 
 model Profile          — id, userId, name, email, role, timestamps
 model Lead             — full lead fields, relations: noteEntries, activities, tasks, followUps, proposals, meetingTranscripts
@@ -119,6 +120,7 @@ model ProposalSection          — id, proposalId, type, title, content, order, 
 model Invoice                  — id, invoiceNumber, leadId, proposalId?, type, status, issueDate, dueDate, client snapshot fields, totals, timestamps.
 model InvoiceItem              — id, invoiceId, description, quantity, unitPrice, total. Cascade on invoice delete.
 model Payment                  — id, invoiceId, amountReceived, paymentDate, paymentMode, transactionReference, utrNumber, notes. Cascade on invoice delete.
+model Service                  — centralized service catalog: core info, pricing, delivery, sales, AI instructions, proposal defaults, invoice defaults, internal notes.
 ```
 
 Full schema at: `prisma/schema.prisma`
@@ -144,6 +146,8 @@ app/
     follow-ups/
       page.tsx                  — dashboard: Overdue / Due Today / Upcoming / Completed
       loading.tsx
+    services/
+      page.tsx                  — reusable service catalog for proposals, invoices, AI, lead qualification
     proposals/
       page.tsx                  — proposals list with status badges
       new/page.tsx              — lead + template selector → triggers generateProposal action
@@ -171,6 +175,7 @@ actions/
   follow-ups.ts         — getFollowUps, getLeadFollowUps, createFollowUp, completeFollowUp, deleteFollowUp, getTemplates
   proposals.ts          — getProposals, getProposal, getProposalForWorkspace, getLeadProposals, updateProposalTitle, updateProposalStatus, updateProposalSection, reorderProposalSection, toggleProposalSectionVisibility, addProposalSection, deleteProposal
   proposal-templates.ts — getProposalTemplates, getProposalTemplate, createProposalTemplate, updateProposalTemplate, deleteProposalTemplate, addProposalTemplateSection, updateProposalTemplateSection, removeProposalTemplateSection, reorderProposalTemplateSection
+  services.ts           — getServices, getActiveServices, getService, createService, updateService, deleteService
   ai.ts                 — generateFollowUpDrafts(leadId, options), generateProposal(leadId, templateId, options)
                           ProposalGenerationOptions: { customInstructions?, transcriptText? }
 
@@ -180,6 +185,7 @@ lib/
   supabase/server.ts, client.ts
   validations/
     lead.ts, note.ts, activity.ts, task.ts, follow-up.ts
+    service.ts                  — serviceSchema, SERVICE_STATUSES, SERVICE_CATEGORIES
     proposal-template.ts        — proposalTemplateSchema, proposalTemplateSectionSchema
   ai/
     types.ts                    — FollowUpTone/Length/Channel/Style, FollowUpGenerationOptions, FollowUpVariation, LeadAIContext, BusinessContext
@@ -189,6 +195,7 @@ lib/
       index.ts                  — re-exports all builders and types
       lead.ts                   — buildLeadContext(lead, notes, activities, followUps, transcripts?) → LeadFullContext
                                    Async: calls summarizeNotes() when notes > 4. Caps activities at 8.
+      service.ts                — buildServiceContext(service), buildServicesContext(services) for prompt-ready catalog context
       summarize.ts              — summarizeNotes(notes[]): calls AI only when notes.length > 4, falls back to first 4 raw
       transcript.ts             — processTranscript(raw): AI extraction → TranscriptInsights (10 fields)
                                    formatTranscriptInsights(insights): compact prompt-ready string, filters noise
@@ -233,6 +240,8 @@ components/
     create-follow-up-dialog.tsx — leadId prop hides lead selector when pre-filled
     complete-follow-up-dialog.tsx — mark complete + next follow-up form (title, date, assignee, notes)
     ai-generator-sheet.tsx      — right-side Sheet: channel/tone/length/style controls → Generate → 3 variations with Copy buttons
+  services/
+    service-form.tsx, create-service-dialog.tsx, edit-service-dialog.tsx, delete-service-dialog.tsx, services-catalog-client.tsx
   proposals/
     generate-proposal-form.tsx  — Client: lead + template selector, custom instructions, collapsible transcript textarea → generateProposal
     workspace/
@@ -478,6 +487,7 @@ OPENAI_MODEL=gpt-4o-mini
 | Leads (CRUD, table, search/filter/sort) | Complete |
 | Lead Detail (overview, notes, activities, tasks, follow-ups) | Complete |
 | Follow-ups Dashboard | Complete |
+| Service Catalog | Complete |
 | AI Follow-up Generator | Complete |
 | Proposals (list, generate, workspace editor) | Complete |
 | Proposal Templates (CRUD, section management) | Complete |

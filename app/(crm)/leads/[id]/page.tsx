@@ -4,9 +4,10 @@ import { ArrowLeft } from "lucide-react"
 import { getLead } from "@/actions/leads"
 import { getNotes } from "@/actions/notes"
 import { getActivities } from "@/actions/activities"
-import { getTasks } from "@/actions/tasks"
+import { getLeadTasks } from "@/actions/tasks"
 import { getLeadFollowUps, getTemplates } from "@/actions/follow-ups"
 import { getLeadProposals } from "@/actions/proposals"
+import { getTeamMembers } from "@/actions/settings"
 import { EditDeleteButtons } from "@/components/lead-detail/edit-delete-buttons"
 import { FollowUpBanner } from "@/components/lead-detail/follow-up-banner"
 import { LeadOverviewCard } from "@/components/lead-detail/overview-card"
@@ -15,6 +16,8 @@ import { ActivitiesSection } from "@/components/lead-detail/activities-section"
 import { TasksSection } from "@/components/lead-detail/tasks-section"
 import { LeadFollowUpsSection } from "@/components/lead-detail/lead-follow-ups-section"
 import { LeadProposalsSection } from "@/components/lead-detail/lead-proposals-section"
+import { LeadFinancialSection } from "@/components/lead-detail/lead-financial-section"
+import { prisma } from "@/lib/prisma"
 
 const STAGE_LABELS: Record<string, string> = {
   NEW_LEAD: "New Lead", QUALIFIED: "Qualified", DISCOVERY_CALL: "Discovery Call",
@@ -48,14 +51,17 @@ export default async function LeadDetailPage({
 }) {
   const { id } = await params
 
-  const [lead, notes, activities, tasks, followUps, templates, proposals] = await Promise.all([
+  const [lead, notes, activities, tasks, followUps, templates, proposals, invoices, receipts, teamMembers] = await Promise.all([
     getLead(id),
     getNotes(id),
     getActivities(id),
-    getTasks(id),
+    getLeadTasks(id),
     getLeadFollowUps(id),
     getTemplates(),
     getLeadProposals(id),
+    prisma.invoice.findMany({ where: { leadId: id }, orderBy: { createdAt: "desc" } }),
+    (prisma as any).receipt.findMany({ where: { leadId: id }, orderBy: { createdAt: "desc" } }).catch(() => []),
+    getTeamMembers().catch(() => []),
   ])
 
   if (!lead) notFound()
@@ -118,7 +124,7 @@ export default async function LeadDetailPage({
       {/* Tasks + Follow-ups — side by side on desktop */}
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-lg border bg-card p-5">
-          <TasksSection tasks={tasks} leadId={id} />
+          <TasksSection tasks={tasks} leadId={id} teamMembers={teamMembers} />
         </div>
         <div className="rounded-lg border bg-card p-5">
           <LeadFollowUpsSection
@@ -126,13 +132,19 @@ export default async function LeadDetailPage({
             leadId={id}
             leadName={lead.name}
             templates={templates}
+            teamMembers={teamMembers}
           />
         </div>
       </div>
 
-      {/* Proposals */}
-      <div className="rounded-lg border bg-card p-5">
-        <LeadProposalsSection proposals={proposals} leadId={id} />
+      {/* Proposals + Financial — side by side on desktop */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-lg border bg-card p-5">
+          <LeadProposalsSection proposals={proposals} leadId={id} />
+        </div>
+        <div className="rounded-lg border bg-card p-5">
+          <LeadFinancialSection invoices={invoices} receipts={receipts} leadId={id} />
+        </div>
       </div>
     </div>
   )
