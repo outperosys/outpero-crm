@@ -196,7 +196,7 @@ export function GenerateInvoiceForm({
                   <FormItem>
                     <FormLabel>GST %</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.1" placeholder="18" {...field} />
+                      <Input type="number" step="0.1" placeholder="18" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
