@@ -10,7 +10,7 @@ export const serviceSchema = z.object({
   name: z.string().min(1, "Name is required"),
   category: z.string().min(1, "Category is required"),
   status: z.enum(["ACTIVE", "DRAFT", "ARCHIVED"]).default("ACTIVE"),
-  shortDescription: z.string().optional(),
+  shortDescription: z.string().min(1, "Short description is required"),
   fullDescription: z.string().optional(),
   startingPrice: z.coerce.number().min(0, "Must be positive").optional(),
   defaultPrice: z.coerce.number().min(0, "Must be positive").optional(),
