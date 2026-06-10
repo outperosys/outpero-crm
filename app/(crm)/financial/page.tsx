@@ -119,7 +119,7 @@ export default async function FinancialDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {receipts.map((rct) => (
+                      {receipts.map((rct: any) => (
                         <TableRow key={rct.id}>
                           <TableCell className="font-medium">
                             <Link href={`/financial/receipts/${rct.id}`} className="hover:underline">
