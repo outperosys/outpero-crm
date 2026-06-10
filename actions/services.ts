@@ -27,7 +27,7 @@ export async function getActiveServices() {
   await requireAuth()
   return prisma.service.findMany({
     where: { status: "ACTIVE" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, category: true },
     orderBy: { name: "asc" },
   })
 }
