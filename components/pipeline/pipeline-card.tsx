@@ -93,10 +93,14 @@ export function PipelineCard({ lead, isDragging, onDragStart }: PipelineCardProp
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {hasProposal && (
-              <FileText className="size-3 text-amber-500" title="Proposal exists" />
+              <span title="Proposal exists">
+                <FileText className="size-3 text-amber-500" />
+              </span>
             )}
             {hasInvoice && (
-              <Receipt className="size-3 text-emerald-500" title="Invoice exists" />
+              <span title="Invoice exists">
+                <Receipt className="size-3 text-emerald-500" />
+              </span>
             )}
           </div>
         </div>
