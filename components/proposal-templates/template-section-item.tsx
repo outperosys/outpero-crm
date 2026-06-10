@@ -198,7 +198,7 @@ export function TemplateSectionItem({ section, templateId, isFirst, isLast }: Te
               <Label className="text-xs">Visual Style</Label>
               <select
                 value={draftVisualStyle}
-                onChange={(e) => setDraftVisualStyle(e.target.value)}
+                onChange={(e) => setDraftVisualStyle(e.target.value as (typeof VISUAL_STYLE_OPTIONS)[number])}
                 className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {VISUAL_STYLE_OPTIONS.map((s) => (
@@ -210,7 +210,7 @@ export function TemplateSectionItem({ section, templateId, isFirst, isLast }: Te
               <Label className="text-xs">Layout</Label>
               <select
                 value={draftLayoutType}
-                onChange={(e) => setDraftLayoutType(e.target.value)}
+                onChange={(e) => setDraftLayoutType(e.target.value as (typeof LAYOUT_TYPE_OPTIONS)[number])}
                 className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {LAYOUT_TYPE_OPTIONS.map((l) => (
