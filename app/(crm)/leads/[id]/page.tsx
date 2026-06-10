@@ -6,7 +6,6 @@ import { getNotes } from "@/actions/notes"
 import { getActivities } from "@/actions/activities"
 import { getLeadTasks } from "@/actions/tasks"
 import { getLeadFollowUps, getTemplates } from "@/actions/follow-ups"
-import { getLeadProposals } from "@/actions/proposals"
 import { getTeamMembers } from "@/actions/settings"
 import { EditDeleteButtons } from "@/components/lead-detail/edit-delete-buttons"
 import { FollowUpBanner } from "@/components/lead-detail/follow-up-banner"
@@ -15,7 +14,6 @@ import { NotesSection } from "@/components/lead-detail/notes-section"
 import { ActivitiesSection } from "@/components/lead-detail/activities-section"
 import { TasksSection } from "@/components/lead-detail/tasks-section"
 import { LeadFollowUpsSection } from "@/components/lead-detail/lead-follow-ups-section"
-import { LeadProposalsSection } from "@/components/lead-detail/lead-proposals-section"
 import { LeadFinancialSection } from "@/components/lead-detail/lead-financial-section"
 import { prisma } from "@/lib/prisma"
 
@@ -51,14 +49,13 @@ export default async function LeadDetailPage({
 }) {
   const { id } = await params
 
-  const [lead, notes, activities, tasks, followUps, templates, proposals, invoices, receipts, teamMembers] = await Promise.all([
+  const [lead, notes, activities, tasks, followUps, templates, invoices, receipts, teamMembers] = await Promise.all([
     getLead(id),
     getNotes(id),
     getActivities(id),
     getLeadTasks(id),
     getLeadFollowUps(id),
     getTemplates(),
-    getLeadProposals(id),
     prisma.invoice.findMany({ where: { leadId: id }, orderBy: { createdAt: "desc" } }),
     (prisma as any).receipt.findMany({ where: { leadId: id }, orderBy: { createdAt: "desc" } }).catch(() => []),
     getTeamMembers().catch(() => []),
@@ -137,14 +134,9 @@ export default async function LeadDetailPage({
         </div>
       </div>
 
-      {/* Proposals + Financial — side by side on desktop */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-lg border bg-card p-5">
-          <LeadProposalsSection proposals={proposals} leadId={id} />
-        </div>
-        <div className="rounded-lg border bg-card p-5">
-          <LeadFinancialSection invoices={invoices} receipts={receipts} leadId={id} />
-        </div>
+      {/* Financial */}
+      <div className="rounded-lg border bg-card p-5">
+        <LeadFinancialSection invoices={invoices} receipts={receipts} leadId={id} />
       </div>
     </div>
   )

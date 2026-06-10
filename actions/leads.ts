@@ -96,7 +96,7 @@ export type PipelineLead = {
   nextFollowUp: Date | null
   assignedTo: string | null
   proposalSent: boolean
-  _count: { proposals: number; invoices: number }
+  _count: { invoices: number }
 }
 
 export async function getPipelineLeads(): Promise<PipelineLead[]> {
@@ -114,7 +114,7 @@ export async function getPipelineLeads(): Promise<PipelineLead[]> {
       nextFollowUp: true,
       assignedTo: true,
       proposalSent: true,
-      _count: { select: { proposals: true, invoices: true } },
+      _count: { select: { invoices: true } },
     },
     orderBy: { createdAt: "desc" },
   }) as Promise<PipelineLead[]>

@@ -263,9 +263,7 @@ export default async function InvoiceDetailPage({
               {invoice.proposal && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Proposal</span>
-                  <Link href={`/proposals/${invoice.proposal.id}`} className="hover:underline truncate max-w-[130px]">
-                    {invoice.proposal.title ?? "View"}
-                  </Link>
+                  <span className="truncate max-w-[130px]">{invoice.proposal.title ?? "—"}</span>
                 </div>
               )}
             </CardContent>

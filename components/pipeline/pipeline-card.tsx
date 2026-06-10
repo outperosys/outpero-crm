@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Bell, FileText, Receipt, ExternalLink, ListTodo } from "lucide-react"
+import { Bell, Receipt, ExternalLink, ListTodo } from "lucide-react"
 import type { PipelineLead } from "@/actions/leads"
 import { formatCurrency } from "@/lib/utils"
 import { TaskDialog } from "@/components/tasks/task-dialog"
@@ -33,7 +33,6 @@ interface PipelineCardProps {
 
 export function PipelineCard({ lead, isDragging, onDragStart }: PipelineCardProps) {
   const fu = followUpLabel(lead.nextFollowUp)
-  const hasProposal = lead._count.proposals > 0
   const hasInvoice = lead._count.invoices > 0
 
   return (
@@ -92,11 +91,6 @@ export function PipelineCard({ lead, isDragging, onDragStart }: PipelineCardProp
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {hasProposal && (
-              <span title="Proposal exists">
-                <FileText className="size-3 text-amber-500" />
-              </span>
-            )}
             {hasInvoice && (
               <span title="Invoice exists">
                 <Receipt className="size-3 text-emerald-500" />
@@ -115,14 +109,6 @@ export function PipelineCard({ lead, isDragging, onDragStart }: PipelineCardProp
         >
           <ExternalLink className="size-3" />
           Open
-        </Link>
-        <Link
-          href={`/proposals/new?leadId=${lead.id}`}
-          onClick={(e) => e.stopPropagation()}
-          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-        >
-          <FileText className="size-3" />
-          Proposal
         </Link>
         <Link
           href={`/financial/invoices/new?leadId=${lead.id}`}

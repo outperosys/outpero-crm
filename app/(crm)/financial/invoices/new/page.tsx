@@ -1,5 +1,4 @@
 import { getLeads } from "@/actions/leads"
-import { getProposals } from "@/actions/proposals"
 import { getServices } from "@/actions/services"
 import { getSettings } from "@/actions/settings"
 import { InvoiceCreator } from "./invoice-creator"
@@ -7,12 +6,11 @@ import { InvoiceCreator } from "./invoice-creator"
 export default async function NewInvoicePage({
   searchParams
 }: {
-  searchParams: Promise<{ proposalId?: string; leadId?: string }>
+  searchParams: Promise<{ leadId?: string }>
 }) {
   const resolvedSearch = await searchParams
-  const [leads, proposals, services, settings] = await Promise.all([
+  const [leads, services, settings] = await Promise.all([
     getLeads(),
-    getProposals(),
     getServices(),
     getSettings().catch(() => null),
   ])
@@ -38,10 +36,8 @@ export default async function NewInvoicePage({
 
       <InvoiceCreator
         leads={leads || []}
-        proposals={proposals || []}
         services={services || []}
         defaultLeadId={resolvedSearch?.leadId}
-        defaultProposalId={resolvedSearch?.proposalId}
         defaultBankDetails={defaultBankDetails}
         defaultTerms={s?.paymentInstructions || s?.terms || undefined}
         defaultGstNumber={s?.gstNumber || undefined}
