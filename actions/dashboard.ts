@@ -1,22 +1,13 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
-import { createClient } from "@/lib/supabase/server"
+import { requireAuth } from "@/lib/auth"
 import { getCurrentUserName } from "@/actions/tasks"
 import { getTeamMembers } from "@/actions/settings"
 import { rankHotLeads } from "@/lib/dashboard/scoring"
 import { buildInsights } from "@/lib/dashboard/insights"
 import type { DashboardData, PipelineSnapshotItem } from "@/lib/dashboard/types"
 import type { PipelineStage } from "@prisma/client"
-
-async function requireAuth() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error("Unauthorized")
-  return user
-}
 
 const DAY_MS = 24 * 60 * 60 * 1000
 

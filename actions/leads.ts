@@ -2,19 +2,10 @@
 
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
-import { createClient } from "@/lib/supabase/server"
+import { requireAuth } from "@/lib/auth"
 import { leadSchema, type LeadFormValues } from "@/lib/validations/lead"
 import type { ActionResult } from "@/types"
 import type { Lead } from "@prisma/client"
-
-async function requireAuth() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error("Unauthorized")
-  return user
-}
 
 export async function getLeads(): Promise<Lead[]> {
   await requireAuth()

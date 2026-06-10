@@ -11,7 +11,7 @@ import { InvoiceStatusUpdater } from "./invoice-status-updater"
 import { EntityTasksCard } from "@/components/tasks/entity-tasks-card"
 import { getTeamMembers } from "@/actions/settings"
 import { ArrowLeft, FileDown, Receipt, ExternalLink } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { getAuthUser } from "@/lib/auth"
 
 const STATUS_BADGE: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   DRAFT: "outline",
@@ -44,8 +44,7 @@ export default async function InvoiceDetailPage({
 }) {
   const { id } = await params
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) notFound()
 
   const invoice = await prisma.invoice.findUnique({

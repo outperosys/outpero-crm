@@ -2,25 +2,13 @@
 
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
-import { createClient } from "@/lib/supabase/server"
+import { requireAuth, getAuthUser } from "@/lib/auth"
 import { taskSchema, taskCommentSchema } from "@/lib/validations/task"
 import type { ActionResult } from "@/types"
 import type { Task, TaskStatus, TaskPriority, TaskRelatedType } from "@prisma/client"
 
-async function requireAuth() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error("Unauthorized")
-  return user
-}
-
 export async function getCurrentUserName(): Promise<string | null> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) return null
   const profile = await prisma.profile.findUnique({ where: { userId: user.id } })
   return profile?.name || profile?.email || user.email || null

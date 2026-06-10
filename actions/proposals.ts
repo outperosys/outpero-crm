@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
-import { createClient } from "@/lib/supabase/server"
+import { requireAuth } from "@/lib/auth"
 import type { ActionResult } from "@/types"
 import type { Proposal, ProposalSection, ProposalStatus } from "@prisma/client"
 
@@ -18,17 +18,6 @@ export type ProposalWithSections = Proposal & {
   lead: { id: string; name: string; companyName: string | null }
   template: { id: string; name: string } | null
   sections: ProposalSection[]
-}
-
-// ─── Auth ──────────────────────────────────────────────────────────────────────
-
-async function requireAuth() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error("Unauthorized")
-  return user
 }
 
 // ─── Queries ───────────────────────────────────────────────────────────────────

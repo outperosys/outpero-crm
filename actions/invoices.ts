@@ -2,19 +2,12 @@
 
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
-import { createClient } from "@/lib/supabase/server"
+import { requireAuth } from "@/lib/auth"
 import { generateInvoiceSchema } from "@/lib/validations/financial"
 import type { ActionResult } from "@/types"
 import { InvoiceStatus, ActivityType } from "@prisma/client"
 import { calculateDueDate, calculateInvoiceTotals } from "@/lib/invoice/utils"
 import { z } from "zod"
-
-async function requireAuth() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error("Unauthorized")
-  return user
-}
 
 export async function getInvoices() {
   await requireAuth()

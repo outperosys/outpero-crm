@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, FileDown, ExternalLink } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { getAuthUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { EntityTasksCard } from "@/components/tasks/entity-tasks-card"
 import { getTeamMembers } from "@/actions/settings"
@@ -18,8 +18,7 @@ export default async function ReceiptDetailPage({
 }) {
   const { id } = await params
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) notFound()
 
   let receipt: any

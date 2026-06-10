@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
-import { createClient } from "@/lib/supabase/server"
+import { requireAuth } from "@/lib/auth"
 import { openai, AI_MODEL } from "@/lib/ai/openai"
 import {
   buildFollowUpSystemPrompt,
@@ -34,15 +34,6 @@ async function getBusinessContext(): Promise<BusinessContext | undefined> {
   } catch {
     return undefined
   }
-}
-
-async function requireAuth() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error("Unauthorized")
-  return user
 }
 
 // ─── Follow-up generation ──────────────────────────────────────────────────────

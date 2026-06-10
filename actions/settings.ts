@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
-import { createClient } from "@/lib/supabase/server"
+import { requireAuth } from "@/lib/auth"
 import type { ActionResult } from "@/types"
 import type { AgencySettings } from "@prisma/client"
 import {
@@ -36,13 +36,6 @@ export type TeamMember = {
 }
 
 const db = prisma as any // eslint-disable-line @typescript-eslint/no-explicit-any
-
-async function requireAuth() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error("Unauthorized")
-  return user
-}
 
 // ─── Singleton getter ─────────────────────────────────────────────────────────
 

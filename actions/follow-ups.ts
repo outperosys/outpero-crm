@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
-import { createClient } from "@/lib/supabase/server"
+import { requireAuth } from "@/lib/auth"
 import { followUpSchema, type FollowUpFormValues } from "@/lib/validations/follow-up"
 import type { ActionResult } from "@/types"
 import type { FollowUp, FollowUpTemplate, Lead } from "@prisma/client"
@@ -10,15 +10,6 @@ import type { FollowUp, FollowUpTemplate, Lead } from "@prisma/client"
 export type FollowUpWithLead = FollowUp & {
   lead: Pick<Lead, "id" | "name" | "companyName" | "priority" | "pipelineStage" | "lastContacted">
   template: FollowUpTemplate | null
-}
-
-async function requireAuth() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error("Unauthorized")
-  return user
 }
 
 export async function getFollowUps(): Promise<FollowUpWithLead[]> {

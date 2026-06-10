@@ -1,5 +1,6 @@
-import { CalendarClock } from "lucide-react"
+import { CalendarClock, Plus } from "lucide-react"
 import type { FollowUp, FollowUpTemplate } from "@prisma/client"
+import { Button } from "@/components/ui/button"
 import { LeadFollowUpItem } from "./lead-follow-up-item"
 import { CreateFollowUpDialog } from "@/components/follow-ups/create-follow-up-dialog"
 
@@ -26,18 +27,19 @@ export function LeadFollowUpsSection({
       <div className="flex items-center gap-2">
         <CalendarClock className="size-4 text-muted-foreground" />
         <h2 className="font-semibold">Follow-ups</h2>
-        {pending.length > 0 && (
-          <span className="text-xs text-muted-foreground">{pending.length} pending</span>
-        )}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {pending.length > 0 && (
+            <span className="text-xs text-muted-foreground">{pending.length} pending</span>
+          )}
           <CreateFollowUpDialog
             templates={templates}
             leadId={leadId}
             teamMembers={teamMembers}
             trigger={
-              <button className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                + Add
-              </button>
+              <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs">
+                <Plus className="size-3.5" />
+                Add
+              </Button>
             }
           />
         </div>
