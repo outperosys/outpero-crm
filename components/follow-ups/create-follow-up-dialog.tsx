@@ -15,11 +15,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { createFollowUp } from "@/actions/follow-ups"
-import type { FollowUpTemplate } from "@prisma/client"
+import { QuickDatePicks, quickDueDate } from "./quick-date-picks"
+import { FOLLOW_UP_PRESETS } from "@/lib/follow-up-presets"
 
 interface CreateFollowUpDialogProps {
   leads?: { id: string; name: string; companyName: string | null }[]
-  templates: FollowUpTemplate[]
   leadId?: string
   trigger?: React.ReactNode
   teamMembers?: { id: string; name: string }[]
@@ -27,34 +27,33 @@ interface CreateFollowUpDialogProps {
 
 export function CreateFollowUpDialog({
   leads,
-  templates,
   leadId: defaultLeadId,
   trigger,
   teamMembers = [],
 }: CreateFollowUpDialogProps) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [dueDate, setDueDate] = useState("")
   const [isPending, startTransition] = useTransition()
 
   const leadIdRef = useRef<HTMLSelectElement>(null)
   const titleRef = useRef<HTMLInputElement>(null)
   const notesRef = useRef<HTMLTextAreaElement>(null)
-  const dueDateRef = useRef<HTMLInputElement>(null)
   const assignedToRef = useRef<HTMLInputElement | HTMLSelectElement>(null)
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
-    if (!next) {
+    if (next) {
+      setDueDate(quickDueDate("Tomorrow"))
+    } else {
       setError(null)
     }
   }
 
-  function handleTemplateChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const template = templates.find((t) => t.id === e.target.value)
-    if (template) {
-      if (titleRef.current) titleRef.current.value = template.title
-      if (notesRef.current) notesRef.current.value = template.notes || ""
-    }
+  function applyPreset(preset: (typeof FOLLOW_UP_PRESETS)[number]) {
+    if (titleRef.current) titleRef.current.value = preset.title
+    if (notesRef.current) notesRef.current.value = preset.notes
+    setDueDate(preset.dueDate())
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -64,7 +63,6 @@ export function CreateFollowUpDialog({
     const leadId = defaultLeadId || leadIdRef.current?.value || ""
     const title = titleRef.current?.value.trim() || ""
     const notes = notesRef.current?.value.trim() || ""
-    const dueDate = dueDateRef.current?.value || ""
     const assignedTo = assignedToRef.current?.value.trim() || ""
 
     startTransition(async () => {
@@ -124,32 +122,32 @@ export function CreateFollowUpDialog({
             </div>
           )}
 
-          {/* Template selector */}
-          {templates.length > 0 && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Template (optional)</Label>
-              <select
-                onChange={handleTemplateChange}
-                defaultValue=""
-                className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <option value="">No template</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+          {/* Quick fill presets */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Quick Fill (optional)</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {FOLLOW_UP_PRESETS.map((preset) => (
+                <Button
+                  key={preset.label}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs font-normal"
+                  onClick={() => applyPreset(preset)}
+                  disabled={isPending}
+                >
+                  {preset.label}
+                </Button>
+              ))}
             </div>
-          )}
+          </div>
 
           {/* Title */}
           <div className="space-y-1.5">
-            <Label className="text-xs">Title</Label>
+            <Label className="text-xs">Title (optional)</Label>
             <Input
               ref={titleRef}
-              placeholder="Follow-up title…"
-              required
+              placeholder="Follow-up"
               disabled={isPending}
               className="text-sm"
             />
@@ -166,40 +164,42 @@ export function CreateFollowUpDialog({
             />
           </div>
 
-          {/* Due date + assigned to */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Due Date &amp; Time</Label>
+          {/* Due date quick picks */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Due Date &amp; Time</Label>
+            <QuickDatePicks value={dueDate} onPick={setDueDate} />
+            <Input
+              type="datetime-local"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              required
+              disabled={isPending}
+              className="text-sm"
+            />
+          </div>
+
+          {/* Assigned to */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Assigned To</Label>
+            {teamMembers.length > 0 ? (
+              <select
+                ref={assignedToRef as React.RefObject<HTMLSelectElement>}
+                disabled={isPending}
+                className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <option value="">Unassigned</option>
+                {teamMembers.map((m) => (
+                  <option key={m.id} value={m.name}>{m.name}</option>
+                ))}
+              </select>
+            ) : (
               <Input
-                ref={dueDateRef}
-                type="datetime-local"
-                required
+                ref={assignedToRef as React.RefObject<HTMLInputElement>}
+                placeholder="Name…"
                 disabled={isPending}
                 className="text-sm"
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Assigned To</Label>
-              {teamMembers.length > 0 ? (
-                <select
-                  ref={assignedToRef as React.RefObject<HTMLSelectElement>}
-                  disabled={isPending}
-                  className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  <option value="">Unassigned</option>
-                  {teamMembers.map((m) => (
-                    <option key={m.id} value={m.name}>{m.name}</option>
-                  ))}
-                </select>
-              ) : (
-                <Input
-                  ref={assignedToRef as React.RefObject<HTMLInputElement>}
-                  placeholder="Name…"
-                  disabled={isPending}
-                  className="text-sm"
-                />
-              )}
-            </div>
+            )}
           </div>
 
           <DialogFooter>

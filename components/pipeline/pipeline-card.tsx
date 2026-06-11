@@ -1,10 +1,19 @@
 "use client"
 
 import Link from "next/link"
-import { Bell, Receipt, ExternalLink, ListTodo } from "lucide-react"
+import { Activity, Bell, Receipt, ExternalLink, ListTodo, StickyNote, Tag as TagIcon } from "lucide-react"
 import type { PipelineLead } from "@/actions/leads"
+import type { Tag } from "@prisma/client"
 import { formatCurrency } from "@/lib/utils"
 import { TaskDialog } from "@/components/tasks/task-dialog"
+import { AssigneeBadge } from "@/components/leads/assignee-badge"
+import { CreateFollowUpDialog } from "@/components/follow-ups/create-follow-up-dialog"
+import { LogActivityDialog } from "@/components/activities/log-activity-dialog"
+import { QuickAddNoteDialog } from "@/components/notes/quick-add-note-dialog"
+import { TagBadge } from "@/components/leads/tag-badge"
+import { LeadTagsPopover } from "@/components/leads/lead-tags-popover"
+import { FollowUpBadge } from "@/components/leads/follow-up-badge"
+import { getFollowUpStatus } from "@/lib/follow-up"
 
 const PRIORITY_STYLES: Record<string, string> = {
   HIGH:   "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
@@ -12,28 +21,18 @@ const PRIORITY_STYLES: Record<string, string> = {
   LOW:    "bg-muted text-muted-foreground",
 }
 
-function followUpLabel(date: Date | null): { text: string; overdue: boolean } | null {
-  if (!date) return null
-  const d = new Date(date)
-  const now = new Date()
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - todayStart.getTime()) / 86400000)
-  if (diff === 0) return { text: "Today", overdue: false }
-  if (diff === 1) return { text: "Tomorrow", overdue: false }
-  if (diff < 0) return { text: `${Math.abs(diff)}d overdue`, overdue: true }
-  if (diff <= 7) return { text: `In ${diff}d`, overdue: false }
-  return { text: d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }), overdue: false }
-}
-
 interface PipelineCardProps {
   lead: PipelineLead
   isDragging: boolean
   onDragStart: (id: string) => void
+  teamMembers?: { id: string; name: string }[]
+  allTags?: Tag[]
 }
 
-export function PipelineCard({ lead, isDragging, onDragStart }: PipelineCardProps) {
-  const fu = followUpLabel(lead.nextFollowUp)
+export function PipelineCard({ lead, isDragging, onDragStart, teamMembers = [], allTags = [] }: PipelineCardProps) {
+  const fu = lead.nextFollowUp ? getFollowUpStatus(lead.nextFollowUp) : null
   const hasInvoice = lead._count.invoices > 0
+  const needsAttention = fu?.urgency === "overdue" || fu?.urgency === "today"
 
   return (
     <div
@@ -44,7 +43,11 @@ export function PipelineCard({ lead, isDragging, onDragStart }: PipelineCardProp
         onDragStart(lead.id)
       }}
       className={`group rounded-md border bg-card select-none cursor-grab active:cursor-grabbing transition-all duration-150 ${
-        isDragging ? "opacity-40 scale-[0.97]" : "hover:border-primary/40 hover:shadow-sm"
+        isDragging
+          ? "opacity-40 scale-[0.97]"
+          : needsAttention
+            ? `${fu?.urgency === "overdue" ? "border-red-300 dark:border-red-900/60" : "border-amber-300 dark:border-amber-900/60"} hover:shadow-sm`
+            : "hover:border-primary/40 hover:shadow-sm"
       }`}
     >
       <div className="p-3 space-y-2">
@@ -75,19 +78,21 @@ export function PipelineCard({ lead, isDragging, onDragStart }: PipelineCardProp
           )}
         </div>
 
+        {/* Tags */}
+        {lead.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {lead.tags.map(({ tag }) => (
+              <TagBadge key={tag.id} name={tag.name} color={tag.color} />
+            ))}
+          </div>
+        )}
+
         {/* Follow-up + assignee + dots */}
         <div className="flex items-center justify-between gap-1">
           <div className="flex items-center gap-1.5 min-w-0">
-            {fu && (
-              <span className={`flex items-center gap-0.5 text-[11px] ${fu.overdue ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground"}`}>
-                <Bell className="size-3 shrink-0" />
-                {fu.text}
-              </span>
-            )}
+            <FollowUpBadge date={lead.nextFollowUp} className="px-1.5 py-0" />
             {lead.assignedTo && (
-              <span className="text-[11px] text-muted-foreground truncate">
-                {fu ? "·" : ""} {lead.assignedTo}
-              </span>
+              <AssigneeBadge name={lead.assignedTo} className="px-1.5 py-0 text-[10px]" />
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -105,18 +110,18 @@ export function PipelineCard({ lead, isDragging, onDragStart }: PipelineCardProp
         <Link
           href={`/leads/${lead.id}`}
           onClick={(e) => e.stopPropagation()}
-          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors rounded-bl-md"
+          title="Open lead"
+          className="flex-1 flex items-center justify-center py-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors rounded-bl-md"
         >
-          <ExternalLink className="size-3" />
-          Open
+          <ExternalLink className="size-3.5" />
         </Link>
         <Link
           href={`/financial/invoices/new?leadId=${lead.id}`}
           onClick={(e) => e.stopPropagation()}
-          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+          title="Create invoice"
+          className="flex-1 flex items-center justify-center py-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
         >
-          <Receipt className="size-3" />
-          Invoice
+          <Receipt className="size-3.5" />
         </Link>
         <TaskDialog
           defaultRelatedType="LEAD"
@@ -125,10 +130,61 @@ export function PipelineCard({ lead, isDragging, onDragStart }: PipelineCardProp
           trigger={
             <button
               onClick={(e) => e.stopPropagation()}
-              className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors rounded-br-md"
+              title="Add task"
+              className="flex-1 flex items-center justify-center py-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
             >
-              <ListTodo className="size-3" />
-              Task
+              <ListTodo className="size-3.5" />
+            </button>
+          }
+        />
+        <CreateFollowUpDialog
+          leadId={lead.id}
+          teamMembers={teamMembers}
+          trigger={
+            <button
+              onClick={(e) => e.stopPropagation()}
+              title="Add follow-up"
+              className="flex-1 flex items-center justify-center py-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+            >
+              <Bell className="size-3.5" />
+            </button>
+          }
+        />
+        <QuickAddNoteDialog
+          leadId={lead.id}
+          trigger={
+            <button
+              onClick={(e) => e.stopPropagation()}
+              title="Add note"
+              className="flex-1 flex items-center justify-center py-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+            >
+              <StickyNote className="size-3.5" />
+            </button>
+          }
+        />
+        <LogActivityDialog
+          leadId={lead.id}
+          trigger={
+            <button
+              onClick={(e) => e.stopPropagation()}
+              title="Log activity"
+              className="flex-1 flex items-center justify-center py-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+            >
+              <Activity className="size-3.5" />
+            </button>
+          }
+        />
+        <LeadTagsPopover
+          leadId={lead.id}
+          allTags={allTags}
+          selectedTagIds={lead.tags.map((t) => t.tagId)}
+          trigger={
+            <button
+              onClick={(e) => e.stopPropagation()}
+              title="Manage tags"
+              className="flex-1 flex items-center justify-center py-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors rounded-br-md"
+            >
+              <TagIcon className="size-3.5" />
             </button>
           }
         />

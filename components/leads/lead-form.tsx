@@ -32,6 +32,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 
+const UNASSIGNED = "__unassigned__"
+
 interface LeadFormProps {
   defaultValues?: Partial<LeadFormValues>
   services?: { id: string; name: string }[]
@@ -545,11 +547,15 @@ export function LeadForm({
                   <FormLabel>Assigned To</FormLabel>
                   <FormControl>
                     {teamMembers.length > 0 ? (
-                      <Select value={field.value || ""} onValueChange={field.onChange}>
-                        <SelectTrigger>
+                      <Select
+                        value={field.value || UNASSIGNED}
+                        onValueChange={(v) => field.onChange(v === UNASSIGNED ? "" : v)}
+                      >
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select team member…" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
                           {teamMembers.map((m) => (
                             <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
                           ))}

@@ -1,5 +1,5 @@
 import { CalendarClock, Plus } from "lucide-react"
-import type { FollowUp, FollowUpTemplate } from "@prisma/client"
+import type { FollowUp } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { LeadFollowUpItem } from "./lead-follow-up-item"
 import { CreateFollowUpDialog } from "@/components/follow-ups/create-follow-up-dialog"
@@ -8,7 +8,6 @@ interface LeadFollowUpsSectionProps {
   followUps: FollowUp[]
   leadId: string
   leadName: string
-  templates: FollowUpTemplate[]
   teamMembers?: { id: string; name: string }[]
 }
 
@@ -16,7 +15,6 @@ export function LeadFollowUpsSection({
   followUps,
   leadId,
   leadName,
-  templates,
   teamMembers = [],
 }: LeadFollowUpsSectionProps) {
   const pending = followUps.filter((f) => !f.completed)
@@ -32,7 +30,6 @@ export function LeadFollowUpsSection({
             <span className="text-xs text-muted-foreground">{pending.length} pending</span>
           )}
           <CreateFollowUpDialog
-            templates={templates}
             leadId={leadId}
             teamMembers={teamMembers}
             trigger={

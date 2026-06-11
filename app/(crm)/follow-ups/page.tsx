@@ -1,5 +1,5 @@
 import { CalendarClock } from "lucide-react"
-import { getFollowUps, getTemplates } from "@/actions/follow-ups"
+import { getFollowUps } from "@/actions/follow-ups"
 import { getLeads } from "@/actions/leads"
 import { getTeamMembers } from "@/actions/settings"
 import { FollowUpCard } from "@/components/follow-ups/follow-up-card"
@@ -31,10 +31,9 @@ function partitionFollowUps(followUps: FollowUpWithLead[]) {
 }
 
 export default async function FollowUpsPage() {
-  const [followUps, leads, templates, teamMembers] = await Promise.all([
+  const [followUps, leads, teamMembers] = await Promise.all([
     getFollowUps(),
     getLeads(),
-    getTemplates(),
     getTeamMembers().catch(() => []),
   ])
 
@@ -59,7 +58,7 @@ export default async function FollowUpsPage() {
               : `${totalPending} pending${overdue.length > 0 ? ` · ${overdue.length} overdue` : ""}`}
           </p>
         </div>
-        <CreateFollowUpDialog leads={leadOptions} templates={templates} teamMembers={teamMembers} />
+        <CreateFollowUpDialog leads={leadOptions} teamMembers={teamMembers} />
       </div>
 
       {/* Empty state */}

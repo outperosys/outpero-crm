@@ -1,14 +1,16 @@
 import { getSettings, getTeamMembers } from "@/actions/settings"
 import { getActiveServices } from "@/actions/services"
+import { getTags } from "@/actions/tags"
 import { SettingsClient } from "./settings-form"
 
 export const metadata = { title: "Settings — Outpero CRM" }
 
 export default async function SettingsPage() {
-  const [settings, teamMembers, services] = await Promise.all([
+  const [settings, teamMembers, services, tags] = await Promise.all([
     getSettings(),
     getTeamMembers(),
     getActiveServices(),
+    getTags(),
   ])
 
   return (
@@ -23,6 +25,7 @@ export default async function SettingsPage() {
         settings={settings}
         teamMembers={teamMembers}
         services={services}
+        tags={tags}
       />
     </div>
   )

@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { completeFollowUp } from "@/actions/follow-ups"
+import { QuickDatePicks } from "./quick-date-picks"
 
 interface CompleteFollowUpDialogProps {
   open: boolean
@@ -32,14 +33,14 @@ export function CompleteFollowUpDialog({
   teamMembers = [],
 }: CompleteFollowUpDialogProps) {
   const [isPending, startTransition] = useTransition()
+  const [nextDate, setNextDate] = useState("")
   const nextTitleRef = useRef<HTMLInputElement>(null)
-  const nextDateRef = useRef<HTMLInputElement>(null)
   const nextNotesRef = useRef<HTMLTextAreaElement>(null)
   const nextAssignedRef = useRef<HTMLInputElement | HTMLSelectElement>(null)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const dueDate = nextDateRef.current?.value || undefined
+    const dueDate = nextDate || undefined
 
     startTransition(async () => {
       const result = await completeFollowUp(
@@ -84,39 +85,40 @@ export function CompleteFollowUpDialog({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Due Date &amp; Time</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Due Date &amp; Time</Label>
+              <QuickDatePicks value={nextDate} onPick={setNextDate} />
+              <Input
+                type="datetime-local"
+                value={nextDate}
+                onChange={(e) => setNextDate(e.target.value)}
+                disabled={isPending}
+                className="text-sm"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Assign To</Label>
+              {teamMembers.length > 0 ? (
+                <select
+                  ref={nextAssignedRef as React.RefObject<HTMLSelectElement>}
+                  disabled={isPending}
+                  defaultValue={assignedTo ?? ""}
+                  className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <option value="">Unassigned</option>
+                  {teamMembers.map((m) => (
+                    <option key={m.id} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
+              ) : (
                 <Input
-                  ref={nextDateRef}
-                  type="datetime-local"
+                  ref={nextAssignedRef as React.RefObject<HTMLInputElement>}
+                  placeholder={assignedTo ?? "Name…"}
                   disabled={isPending}
                   className="text-sm"
                 />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Assign To</Label>
-                {teamMembers.length > 0 ? (
-                  <select
-                    ref={nextAssignedRef as React.RefObject<HTMLSelectElement>}
-                    disabled={isPending}
-                    defaultValue={assignedTo ?? ""}
-                    className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                  >
-                    <option value="">Unassigned</option>
-                    {teamMembers.map((m) => (
-                      <option key={m.id} value={m.name}>{m.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <Input
-                    ref={nextAssignedRef as React.RefObject<HTMLInputElement>}
-                    placeholder={assignedTo ?? "Name…"}
-                    disabled={isPending}
-                    className="text-sm"
-                  />
-                )}
-              </div>
+              )}
             </div>
 
             <div className="space-y-1.5">

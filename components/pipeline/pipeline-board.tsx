@@ -13,6 +13,7 @@ import {
 import { PipelineCard } from "./pipeline-card"
 import { updateLeadStage, type PipelineLead } from "@/actions/leads"
 import { formatCurrency } from "@/lib/utils"
+import type { Tag } from "@prisma/client"
 
 // ─── Stage config ─────────────────────────────────────────────────────────────
 
@@ -38,9 +39,13 @@ function unique(arr: (string | null)[]): string[] {
 export function PipelineBoard({
   initialLeads,
   stageLabels = {},
+  teamMembers = [],
+  allTags = [],
 }: {
   initialLeads: PipelineLead[]
   stageLabels?: Record<string, string>
+  teamMembers?: { id: string; name: string }[]
+  allTags?: Tag[]
 }) {
   const [leads, setLeads] = useState<PipelineLead[]>(initialLeads)
   const [, startTransition] = useTransition()
@@ -223,6 +228,8 @@ export function PipelineBoard({
                       lead={lead}
                       isDragging={draggingId === lead.id}
                       onDragStart={handleDragStart}
+                      teamMembers={teamMembers}
+                      allTags={allTags}
                     />
                   ))
                 )}

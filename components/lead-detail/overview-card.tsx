@@ -1,5 +1,6 @@
 import type { Lead } from "@prisma/client"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { AssigneeBadge } from "@/components/leads/assignee-badge"
 
 function Field({
   label,
@@ -115,7 +116,10 @@ export function LeadOverviewCard({ lead }: { lead: Lead }) {
         </Section>
 
         <Section title="Internal">
-          <Field label="Assigned To" value={lead.assignedTo} />
+          <div className="space-y-0.5">
+            <p className="text-xs text-muted-foreground">Assigned To</p>
+            <AssigneeBadge name={lead.assignedTo} />
+          </div>
           <div className="col-span-2">
             <Field label="Quick Note" value={lead.notes} />
           </div>

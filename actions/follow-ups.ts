@@ -50,7 +50,8 @@ export async function createFollowUp(
     return { success: false, error: parsed.error.errors[0].message }
   }
 
-  const { leadId, title, notes, dueDate, assignedTo, templateId } = parsed.data
+  const { leadId, notes, dueDate, assignedTo, templateId } = parsed.data
+  const title = parsed.data.title?.trim() || "Follow-up"
 
   const followUp = await prisma.followUp.create({
     data: {
@@ -150,11 +151,6 @@ export async function deleteFollowUp(id: string): Promise<ActionResult> {
   revalidatePath("/follow-ups")
   revalidatePath(`/leads/${followUp.leadId}`)
   return { success: true, data: undefined }
-}
-
-export async function getTemplates(): Promise<FollowUpTemplate[]> {
-  await requireAuth()
-  return prisma.followUpTemplate.findMany({ orderBy: { name: "asc" } })
 }
 
 async function syncLeadNextFollowUp(leadId: string) {

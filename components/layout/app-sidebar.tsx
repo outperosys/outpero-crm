@@ -7,10 +7,12 @@ import {
   Users,
   Kanban,
   CalendarClock,
+  Video,
   Receipt,
   Wrench,
   Building2,
   CheckSquare,
+  Activity,
   Settings,
 } from "lucide-react"
 import {
@@ -29,6 +31,8 @@ const navMain = [
   { label: "Leads", href: "/leads", icon: Users },
   { label: "Pipeline", href: "/pipeline", icon: Kanban },
   { label: "Follow-ups", href: "/follow-ups", icon: CalendarClock },
+  { label: "Activity", href: "/activity", icon: Activity },
+  { label: "Meetings", href: "/meetings", icon: Video },
   { label: "Services", href: "/services", icon: Wrench },
   { label: "Financial", href: "/financial", icon: Receipt },
   { label: "Clients", href: "/clients", icon: Building2 },

@@ -5,7 +5,7 @@ import { getLead } from "@/actions/leads"
 import { getNotes } from "@/actions/notes"
 import { getActivities } from "@/actions/activities"
 import { getLeadTasks } from "@/actions/tasks"
-import { getLeadFollowUps, getTemplates } from "@/actions/follow-ups"
+import { getLeadFollowUps } from "@/actions/follow-ups"
 import { getTeamMembers } from "@/actions/settings"
 import { EditDeleteButtons } from "@/components/lead-detail/edit-delete-buttons"
 import { FollowUpBanner } from "@/components/lead-detail/follow-up-banner"
@@ -15,6 +15,12 @@ import { ActivitiesSection } from "@/components/lead-detail/activities-section"
 import { TasksSection } from "@/components/lead-detail/tasks-section"
 import { LeadFollowUpsSection } from "@/components/lead-detail/lead-follow-ups-section"
 import { LeadFinancialSection } from "@/components/lead-detail/lead-financial-section"
+import { LeadMeetingsSection } from "@/components/lead-detail/lead-meetings-section"
+import { getLeadMeetings } from "@/actions/meetings"
+import { AssigneeBadge } from "@/components/leads/assignee-badge"
+import { TagBadge } from "@/components/leads/tag-badge"
+import { LeadTagsPopover } from "@/components/leads/lead-tags-popover"
+import { getTags } from "@/actions/tags"
 import { prisma } from "@/lib/prisma"
 
 const STAGE_LABELS: Record<string, string> = {
@@ -49,16 +55,17 @@ export default async function LeadDetailPage({
 }) {
   const { id } = await params
 
-  const [lead, notes, activities, tasks, followUps, templates, invoices, receipts, teamMembers] = await Promise.all([
+  const [lead, notes, activities, tasks, followUps, invoices, receipts, teamMembers, meetings, allTags] = await Promise.all([
     getLead(id),
     getNotes(id),
     getActivities(id),
     getLeadTasks(id),
     getLeadFollowUps(id),
-    getTemplates(),
     prisma.invoice.findMany({ where: { leadId: id }, orderBy: { createdAt: "desc" } }),
     (prisma as any).receipt.findMany({ where: { leadId: id }, orderBy: { createdAt: "desc" } }).catch(() => []),
     getTeamMembers().catch(() => []),
+    getLeadMeetings(id),
+    getTags(),
   ])
 
   if (!lead) notFound()
@@ -93,6 +100,15 @@ export default async function LeadDetailPage({
                   · ${lead.dealValue.toLocaleString()}
                 </span>
               )}
+              <AssigneeBadge name={lead.assignedTo} />
+              {lead.tags.map(({ tag }) => (
+                <TagBadge key={tag.id} name={tag.name} color={tag.color} />
+              ))}
+              <LeadTagsPopover
+                leadId={lead.id}
+                allTags={allTags}
+                selectedTagIds={lead.tags.map((t) => t.tagId)}
+              />
             </div>
           </div>
 
@@ -128,10 +144,14 @@ export default async function LeadDetailPage({
             followUps={followUps}
             leadId={id}
             leadName={lead.name}
-            templates={templates}
             teamMembers={teamMembers}
           />
         </div>
+      </div>
+
+      {/* Meetings */}
+      <div className="rounded-lg border bg-card p-5">
+        <LeadMeetingsSection meetings={meetings} leadId={id} teamMembers={teamMembers} />
       </div>
 
       {/* Financial */}

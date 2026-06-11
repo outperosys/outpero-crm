@@ -15,6 +15,19 @@ export async function getActivities(leadId: string): Promise<Activity[]> {
   })
 }
 
+export type ActivityWithLead = Activity & {
+  lead: { id: string; name: string; companyName: string | null }
+}
+
+export async function getAllActivities(limit = 150): Promise<ActivityWithLead[]> {
+  await requireAuth()
+  return prisma.activity.findMany({
+    take: limit,
+    orderBy: { createdAt: "desc" },
+    include: { lead: { select: { id: true, name: true, companyName: true } } },
+  })
+}
+
 export async function createActivity(
   leadId: string,
   data: { type: string; description: string; createdBy?: string }
@@ -31,6 +44,7 @@ export async function createActivity(
   })
 
   revalidatePath(`/leads/${leadId}`)
+  revalidatePath("/activity")
   return { success: true, data: activity }
 }
 
@@ -41,5 +55,6 @@ export async function deleteActivity(
   await requireAuth()
   await prisma.activity.delete({ where: { id } })
   revalidatePath(`/leads/${leadId}`)
+  revalidatePath("/activity")
   return { success: true, data: undefined }
 }

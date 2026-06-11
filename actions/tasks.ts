@@ -1,18 +1,19 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { cache } from "react"
 import { prisma } from "@/lib/prisma"
 import { requireAuth, getAuthUser } from "@/lib/auth"
 import { taskSchema, taskCommentSchema } from "@/lib/validations/task"
 import type { ActionResult } from "@/types"
 import type { Task, TaskStatus, TaskPriority, TaskRelatedType } from "@prisma/client"
 
-export async function getCurrentUserName(): Promise<string | null> {
+export const getCurrentUserName = cache(async (): Promise<string | null> => {
   const user = await getAuthUser()
   if (!user) return null
   const profile = await prisma.profile.findUnique({ where: { userId: user.id } })
   return profile?.name || profile?.email || user.email || null
-}
+})
 
 const taskInclude = {
   lead: { select: { id: true, name: true, companyName: true } },

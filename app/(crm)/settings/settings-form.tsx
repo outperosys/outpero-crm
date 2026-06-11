@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Check, Plus, Trash2, Power } from "lucide-react"
+import { Check, Plus, Trash2, Power, Pencil, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -36,6 +36,9 @@ import {
   deleteTeamMember,
   type TeamMember,
 } from "@/actions/settings"
+import { createTag, updateTag, deleteTag } from "@/actions/tags"
+import { tagSchema, type TagValues } from "@/lib/validations/tag"
+import { TAG_COLORS, tagColorClasses, tagColorDot } from "@/lib/tag-colors"
 import {
   businessSettingsSchema,
   brandingSettingsSchema,
@@ -54,7 +57,7 @@ import {
   type AISettingsValues,
   type TeamMemberValues,
 } from "@/lib/validations/settings"
-import type { AgencySettings } from "@prisma/client"
+import type { AgencySettings, Tag } from "@prisma/client"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,6 +67,7 @@ interface SettingsClientProps {
   settings: AgencySettings
   teamMembers: TeamMember[]
   services: Service[]
+  tags: Tag[]
 }
 
 // ─── Nav ─────────────────────────────────────────────────────────────────────
@@ -76,6 +80,7 @@ const NAV = [
   { key: "services",  label: "Services" },
   { key: "pipeline",  label: "Pipeline" },
   { key: "team",      label: "Team" },
+  { key: "tags",      label: "Tags" },
 ] as const
 
 type NavKey = typeof NAV[number]["key"]
@@ -872,9 +877,196 @@ function TeamSection({ teamMembers: initial }: { teamMembers: TeamMember[] }) {
   )
 }
 
+// ─── Tags ────────────────────────────────────────────────────────────────────
+
+function TagForm({ defaultValues, onSubmit, onCancel, submitLabel }: {
+  defaultValues: TagValues
+  onSubmit: (data: TagValues) => void
+  onCancel?: () => void
+  submitLabel: string
+}) {
+  const form = useForm<TagValues>({
+    resolver: zodResolver(tagSchema),
+    defaultValues,
+  })
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+        <FormField control={form.control} name="name" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Name</FormLabel>
+            <FormControl><Input placeholder="VIP" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <FormField control={form.control} name="color" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Color</FormLabel>
+            <FormControl>
+              <div className="flex flex-wrap gap-2">
+                {TAG_COLORS.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => field.onChange(c.value)}
+                    title={c.label}
+                    className={cn(
+                      "size-6 rounded-full ring-offset-2 ring-offset-background transition-shadow",
+                      tagColorDot(c.value),
+                      field.value === c.value ? "ring-2 ring-foreground" : "hover:ring-2 hover:ring-muted-foreground/40"
+                    )}
+                  />
+                ))}
+              </div>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <div className="flex items-center gap-2 pt-1">
+          <Button type="submit" size="sm" disabled={form.formState.isSubmitting}>
+            {form.formState.isSubmitting ? "Saving…" : submitLabel}
+          </Button>
+          {onCancel && (
+            <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+        </div>
+      </form>
+    </Form>
+  )
+}
+
+function TagsSection({ tags: initial }: { tags: Tag[] }) {
+  const [tags, setTags] = useState<Tag[]>(initial)
+  const [showAdd, setShowAdd] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [error, setError] = useState("")
+  const [, startTransition] = useTransition()
+
+  function handleAdd(data: TagValues) {
+    setError("")
+    startTransition(async () => {
+      const res = await createTag(data)
+      if (res.success) {
+        setTags(prev => [...prev, res.data].sort((a, b) => a.name.localeCompare(b.name)))
+        setShowAdd(false)
+      } else {
+        setError(res.error)
+      }
+    })
+  }
+
+  function handleEdit(id: string, data: TagValues) {
+    setError("")
+    startTransition(async () => {
+      const res = await updateTag(id, data)
+      if (res.success) {
+        setTags(prev => prev.map(t => t.id === id ? res.data : t).sort((a, b) => a.name.localeCompare(b.name)))
+        setEditingId(null)
+      } else {
+        setError(res.error)
+      }
+    })
+  }
+
+  function handleDelete(id: string) {
+    startTransition(async () => {
+      const res = await deleteTag(id)
+      if (res.success) {
+        setTags(prev => prev.filter(t => t.id !== id))
+      }
+    })
+  }
+
+  return (
+    <div className="space-y-6">
+      <SectionHeader title="Tags" description="Custom labels you can apply to leads — visible in the pipeline and lead list" />
+
+      {tags.length === 0 && !showAdd && (
+        <p className="text-sm text-muted-foreground py-6 text-center border border-dashed rounded-md">
+          No tags yet
+        </p>
+      )}
+
+      {tags.length > 0 && (
+        <div className="rounded-md border divide-y">
+          {tags.map(tag => (
+            <div key={tag.id} className="px-4 py-3">
+              {editingId === tag.id ? (
+                <TagForm
+                  defaultValues={{ name: tag.name, color: tag.color as TagValues["color"] }}
+                  submitLabel="Save"
+                  onSubmit={(data) => handleEdit(tag.id, data)}
+                  onCancel={() => setEditingId(null)}
+                />
+              ) : (
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <span className={cn(
+                      "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
+                      tagColorClasses(tag.color)
+                    )}>
+                      {tag.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      title="Edit"
+                      onClick={() => setEditingId(tag.id)}
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      title="Delete"
+                      onClick={() => handleDelete(tag.id)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {showAdd ? (
+        <div className="rounded-md border p-4 space-y-4 bg-muted/20">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Add Tag</p>
+            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setShowAdd(false); setError("") }}>
+              <X className="size-3.5" />
+            </Button>
+          </div>
+          <TagForm
+            defaultValues={{ name: "", color: "slate" }}
+            submitLabel="Add"
+            onSubmit={handleAdd}
+          />
+        </div>
+      ) : (
+        <Button variant="outline" size="sm" onClick={() => setShowAdd(true)}>
+          <Plus className="size-3.5 mr-1.5" />
+          Add Tag
+        </Button>
+      )}
+    </div>
+  )
+}
+
 // ─── Root client component ────────────────────────────────────────────────────
 
-export function SettingsClient({ settings, teamMembers, services }: SettingsClientProps) {
+export function SettingsClient({ settings, teamMembers, services, tags }: SettingsClientProps) {
   const [active, setActive] = useState<NavKey>("business")
 
   return (
@@ -906,6 +1098,7 @@ export function SettingsClient({ settings, teamMembers, services }: SettingsClie
         {active === "services"  && <ServicesSection  settings={settings} services={services} />}
         {active === "pipeline"  && <PipelineSection  settings={settings} />}
         {active === "team"      && <TeamSection      teamMembers={teamMembers} />}
+        {active === "tags"      && <TagsSection      tags={tags} />}
       </div>
     </div>
   )

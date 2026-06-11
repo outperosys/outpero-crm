@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { cache } from "react"
 import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth"
 import type { ActionResult } from "@/types"
@@ -166,10 +167,10 @@ export async function updatePipelineSettings(data: PipelineSettingsValues): Prom
 
 // ─── Team CRUD ────────────────────────────────────────────────────────────────
 
-export async function getTeamMembers(): Promise<TeamMember[]> {
+export const getTeamMembers = cache(async (): Promise<TeamMember[]> => {
   await requireAuth()
   return db.teamMember.findMany({ orderBy: { createdAt: "asc" } })
-}
+})
 
 export async function createTeamMember(data: TeamMemberValues): Promise<ActionResult<TeamMember>> {
   await requireAuth()

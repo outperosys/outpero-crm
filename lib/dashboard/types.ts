@@ -8,6 +8,7 @@ export interface TodaysFocus {
   tasksDueToday: number
   overdueTasks: number
   unpaidInvoices: number
+  meetingsToday: number
 }
 
 export interface SalesOverview {

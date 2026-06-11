@@ -1,15 +1,17 @@
 import { getLeads } from "@/actions/leads"
 import { getActiveServices } from "@/actions/services"
 import { getTeamMembers } from "@/actions/settings"
+import { getTags } from "@/actions/tags"
 import { LeadsTableClient } from "@/components/leads/leads-table-client"
 
 export const metadata = { title: "Leads — Outpero CRM" }
 
 export default async function LeadsPage() {
-  const [leads, services, teamMembers] = await Promise.all([
+  const [leads, services, teamMembers, tags] = await Promise.all([
     getLeads(),
     getActiveServices(),
     getTeamMembers().catch(() => []),
+    getTags(),
   ])
 
   return (
@@ -23,7 +25,7 @@ export default async function LeadsPage() {
         </p>
       </div>
 
-      <LeadsTableClient leads={leads} services={services} teamMembers={teamMembers} />
+      <LeadsTableClient leads={leads} services={services} teamMembers={teamMembers} allTags={tags} />
     </div>
   )
 }

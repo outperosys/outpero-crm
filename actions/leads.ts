@@ -5,16 +5,23 @@ import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth"
 import { leadSchema, type LeadFormValues } from "@/lib/validations/lead"
 import type { ActionResult } from "@/types"
-import type { Lead } from "@prisma/client"
+import type { Lead, LeadTag, Tag } from "@prisma/client"
 
-export async function getLeads(): Promise<Lead[]> {
+export type LeadWithTags = Lead & { tags: (LeadTag & { tag: Tag })[] }
+
+const TAGS_INCLUDE = { tags: { include: { tag: true } } } as const
+
+export async function getLeads(): Promise<LeadWithTags[]> {
   await requireAuth()
-  return prisma.lead.findMany({ orderBy: { createdAt: "desc" } })
+  return prisma.lead.findMany({
+    orderBy: { createdAt: "desc" },
+    include: TAGS_INCLUDE,
+  })
 }
 
-export async function getLead(id: string): Promise<Lead | null> {
+export async function getLead(id: string): Promise<LeadWithTags | null> {
   await requireAuth()
-  return prisma.lead.findUnique({ where: { id } })
+  return prisma.lead.findUnique({ where: { id }, include: TAGS_INCLUDE })
 }
 
 export async function createLead(
@@ -88,6 +95,7 @@ export type PipelineLead = {
   assignedTo: string | null
   proposalSent: boolean
   _count: { invoices: number }
+  tags: (LeadTag & { tag: Tag })[]
 }
 
 export async function getPipelineLeads(): Promise<PipelineLead[]> {
@@ -106,6 +114,7 @@ export async function getPipelineLeads(): Promise<PipelineLead[]> {
       assignedTo: true,
       proposalSent: true,
       _count: { select: { invoices: true } },
+      tags: { include: { tag: true } },
     },
     orderBy: { createdAt: "desc" },
   }) as Promise<PipelineLead[]>

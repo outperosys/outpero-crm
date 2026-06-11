@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { Pencil, Search, Trash2, Users } from "lucide-react"
-import type { Lead } from "@prisma/client"
+import { Activity, Bell, Pencil, Search, StickyNote, Trash2, Users } from "lucide-react"
+import type { Tag } from "@prisma/client"
+import type { LeadWithTags } from "@/actions/leads"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -18,6 +19,13 @@ import { PIPELINE_STAGES, PRIORITIES } from "@/lib/validations/lead"
 import { CreateLeadDialog } from "./create-lead-dialog"
 import { EditLeadDialog } from "./edit-lead-dialog"
 import { DeleteLeadDialog } from "./delete-lead-dialog"
+import { AssigneeBadge } from "./assignee-badge"
+import { TagBadge } from "./tag-badge"
+import { LeadTagsPopover } from "./lead-tags-popover"
+import { FollowUpBadge } from "./follow-up-badge"
+import { CreateFollowUpDialog } from "@/components/follow-ups/create-follow-up-dialog"
+import { LogActivityDialog } from "@/components/activities/log-activity-dialog"
+import { QuickAddNoteDialog } from "@/components/notes/quick-add-note-dialog"
 
 // ─── Badge helpers ─────────────────────────────────────────────────────────────
 
@@ -88,17 +96,18 @@ function EmptyState({ isFiltered }: { isFiltered: boolean }) {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 interface LeadsTableClientProps {
-  leads: Lead[]
+  leads: LeadWithTags[]
   services?: { id: string; name: string }[]
   teamMembers?: { id: string; name: string }[]
+  allTags?: Tag[]
 }
 
-export function LeadsTableClient({ leads, services = [], teamMembers = [] }: LeadsTableClientProps) {
+export function LeadsTableClient({ leads, services = [], teamMembers = [], allTags = [] }: LeadsTableClientProps) {
   const [search, setSearch] = useState("")
   const [stageFilter, setStageFilter] = useState("ALL")
   const [priorityFilter, setPriorityFilter] = useState("ALL")
-  const [editingLead, setEditingLead] = useState<Lead | null>(null)
-  const [deletingLead, setDeletingLead] = useState<Lead | null>(null)
+  const [editingLead, setEditingLead] = useState<LeadWithTags | null>(null)
+  const [deletingLead, setDeletingLead] = useState<LeadWithTags | null>(null)
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -182,10 +191,16 @@ export function LeadsTableClient({ leads, services = [], teamMembers = [] }: Lea
                     Lead
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Tags
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Stage
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Priority
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Assigned
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Deal Value
@@ -224,11 +239,28 @@ export function LeadsTableClient({ leads, services = [], teamMembers = [] }: Lea
                     </td>
 
                     <td className="px-4 py-3.5">
+                      <div className="flex flex-wrap items-center gap-1">
+                        {lead.tags.map(({ tag }) => (
+                          <TagBadge key={tag.id} name={tag.name} color={tag.color} />
+                        ))}
+                        <LeadTagsPopover
+                          leadId={lead.id}
+                          allTags={allTags}
+                          selectedTagIds={lead.tags.map((t) => t.tagId)}
+                        />
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3.5">
                       <StageBadge stage={lead.pipelineStage} />
                     </td>
 
                     <td className="px-4 py-3.5">
                       <PriorityBadge priority={lead.priority} />
+                    </td>
+
+                    <td className="px-4 py-3.5">
+                      <AssigneeBadge name={lead.assignedTo} />
                     </td>
 
                     <td className="px-4 py-3.5 text-muted-foreground">
@@ -238,7 +270,14 @@ export function LeadsTableClient({ leads, services = [], teamMembers = [] }: Lea
                     </td>
 
                     <td className="px-4 py-3.5 text-muted-foreground">
-                      {lead.nextFollowUp ? formatDate(lead.nextFollowUp) : "—"}
+                      {lead.nextFollowUp ? (
+                        <div className="flex items-center gap-2">
+                          <span>{formatDate(lead.nextFollowUp)}</span>
+                          <FollowUpBadge date={lead.nextFollowUp} hideLater />
+                        </div>
+                      ) : (
+                        "—"
+                      )}
                     </td>
 
                     <td className="px-4 py-3.5 text-muted-foreground">
@@ -247,6 +286,43 @@ export function LeadsTableClient({ leads, services = [], teamMembers = [] }: Lea
 
                     <td className="px-4 py-3.5">
                       <div className="flex items-center justify-end gap-1">
+                        <CreateFollowUpDialog
+                          leadId={lead.id}
+                          teamMembers={teamMembers}
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label="Add follow-up"
+                            >
+                              <Bell className="size-3.5" />
+                            </Button>
+                          }
+                        />
+                        <QuickAddNoteDialog
+                          leadId={lead.id}
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label="Add note"
+                            >
+                              <StickyNote className="size-3.5" />
+                            </Button>
+                          }
+                        />
+                        <LogActivityDialog
+                          leadId={lead.id}
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label="Log activity"
+                            >
+                              <Activity className="size-3.5" />
+                            </Button>
+                          }
+                        />
                         <Button
                           variant="ghost"
                           size="icon-sm"

@@ -94,6 +94,22 @@ enum TranscriptSource {
   ZOOM
 }
 
+enum MeetingType {
+  DISCOVERY_CALL
+  DEMO
+  ONBOARDING
+  CHECK_IN
+  INTERNAL
+  OTHER
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
 enum InvoiceType {
   FULL_PAYMENT
   ADVANCE_PAYMENT
@@ -216,11 +232,35 @@ model Lead {
   tasks              Task[]
   followUps          FollowUp[]
   proposals          Proposal[]
+  meetings           Meeting[]
   meetingTranscripts MeetingTranscript[]
   invoices           Invoice[]
   receipts           Receipt[]
+  tags               LeadTag[]
 
   @@map("leads")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  color     String   @default("slate")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  leads LeadTag[]
+
+  @@map("tags")
+}
+
+model LeadTag {
+  leadId String @map("lead_id")
+  tagId  String @map("tag_id")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, tagId])
+  @@map("lead_tags")
 }
 
 model Note {
@@ -416,15 +456,42 @@ model ProposalSection {
 model MeetingTranscript {
   id          String           @id @default(cuid())
   leadId      String           @map("lead_id")
+  meetingId   String?          @unique @map("meeting_id")
   rawText     String?          @map("raw_text")
   insights    Json
   source      TranscriptSource @default(MANUAL)
   processedAt DateTime         @default(now()) @map("processed_at")
   createdAt   DateTime         @default(now()) @map("created_at")
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead    Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  meeting Meeting? @relation(fields: [meetingId], references: [id], onDelete: SetNull)
 
   @@map("meeting_transcripts")
+}
+
+model Meeting {
+  id              String        @id @default(cuid())
+  leadId          String        @map("lead_id")
+  title           String
+  type            MeetingType   @default(DISCOVERY_CALL)
+  status          MeetingStatus @default(SCHEDULED)
+  scheduledAt     DateTime      @map("scheduled_at")
+  durationMinutes Int?          @map("duration_minutes")
+  meetingLink     String?       @map("meeting_link")
+  location        String?
+  notes           String?
+  assignedTo      String?       @map("assigned_to")
+  createdBy       String?       @map("created_by")
+  completedAt     DateTime?     @map("completed_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  lead       Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  transcript MeetingTranscript?
+
+  @@index([scheduledAt])
+  @@index([status])
+  @@map("meetings")
 }
 
 // ─── Service Catalog ──────────────────────────────────────────────────────────

@@ -45,6 +45,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     tasksDueToday,
     overdueTasks,
     unpaidInvoices,
+    meetingsToday,
     totalLeads,
     totalLeadsLast30,
     activeLeads,
@@ -79,6 +80,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     prisma.task.count({ where: { status: { not: "DONE" }, dueDate: { gte: todayStart, lt: todayEnd } } }),
     prisma.task.count({ where: { status: { not: "DONE" }, dueDate: { lt: todayStart } } }),
     prisma.invoice.count({ where: { status: { in: ["SENT", "PARTIALLY_PAID", "OVERDUE"] } } }),
+    prisma.meeting.count({ where: { status: "SCHEDULED", scheduledAt: { gte: todayStart, lt: todayEnd } } }),
 
     prisma.lead.count(),
     prisma.lead.count({ where: { createdAt: { gte: days30Ago } } }),
@@ -218,6 +220,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       tasksDueToday,
       overdueTasks,
       unpaidInvoices,
+      meetingsToday,
     },
     salesOverview: {
       totalLeads,
