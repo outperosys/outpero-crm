@@ -1,4 +1,4 @@
-import { openai, AI_MODEL } from "@/lib/ai/openai"
+import { getOpenAI, AI_MODEL } from "@/lib/ai/openai"
 
 const MAX_RAW_CHARS = 6000
 
@@ -24,7 +24,7 @@ export function trimTranscript(raw: string): string {
 export async function processTranscript(raw: string): Promise<TranscriptInsights> {
   const trimmed = trimTranscript(raw)
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: AI_MODEL,
     messages: [
       {

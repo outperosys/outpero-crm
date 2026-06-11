@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth"
-import { openai, AI_MODEL } from "@/lib/ai/openai"
+import { getOpenAI, AI_MODEL } from "@/lib/ai/openai"
 import {
   buildFollowUpSystemPrompt,
   buildFollowUpUserPrompt,
@@ -84,7 +84,7 @@ export async function generateFollowUpDrafts(
   const userPrompt = buildFollowUpUserPrompt(lead, activities, options)
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: AI_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
@@ -290,7 +290,7 @@ export async function generateProposal(
         )
         const sectionTokens =
           (SECTION_MAX_TOKENS[templateSection.type] ?? DEFAULT_MAX_TOKENS) + REFINEMENT_BUFFER
-        const completion = await openai.chat.completions.create({
+        const completion = await getOpenAI().chat.completions.create({
           model: AI_MODEL,
           messages: [
             { role: "system", content: refinementSystemPrompt },
@@ -315,7 +315,7 @@ export async function generateProposal(
           templateSection.aiInstructions ?? undefined
         )
         const sectionTokens = SECTION_MAX_TOKENS[templateSection.type] ?? DEFAULT_MAX_TOKENS
-        const completion = await openai.chat.completions.create({
+        const completion = await getOpenAI().chat.completions.create({
           model: AI_MODEL,
           messages: [
             { role: "system", content: systemPrompt },

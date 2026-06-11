@@ -1,4 +1,4 @@
-import { openai, AI_MODEL } from "@/lib/ai/openai"
+import { getOpenAI, AI_MODEL } from "@/lib/ai/openai"
 
 // Only call AI summarization when notes exceed this count.
 // Below the gate: format notes directly (cheaper + faster).
@@ -19,7 +19,7 @@ export async function summarizeNotes(notes: string[]): Promise<string> {
     .join("\n\n---\n\n")
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: AI_MODEL,
       messages: [
         {
