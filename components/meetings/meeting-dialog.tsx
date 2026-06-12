@@ -71,7 +71,8 @@ export function MeetingDialog({
     const leadId = meeting?.leadId || defaultLeadId || leadIdRef.current?.value || ""
     const title = titleRef.current?.value.trim() || ""
     const type = (typeRef.current?.value || "DISCOVERY_CALL") as (typeof MEETING_TYPES)[number]
-    const scheduledAt = scheduledAtRef.current?.value || ""
+    const scheduledAtRaw = scheduledAtRef.current?.value || ""
+    const scheduledAt = scheduledAtRaw ? new Date(scheduledAtRaw).toISOString() : ""
     const durationMinutes = durationRef.current?.value.trim() || ""
     const meetingLink = meetingLinkRef.current?.value.trim() || ""
     const location = locationRef.current?.value.trim() || ""
